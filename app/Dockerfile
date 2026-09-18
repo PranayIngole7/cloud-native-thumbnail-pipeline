@@ -5,7 +5,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+RUN useradd --create-home appuser
+
 COPY src ./src
+
+USER appuser
 
 EXPOSE 8000
 
