@@ -1,13 +1,19 @@
+from uuid import uuid4
 from io import BytesIO
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from PIL import Image, UnidentifiedImageError
 
+from .storage.factory import create_object_storage
+from .storage.object_keys import original_key, thumbnail_key
+
 app = FastAPI(
     title="Cloud-Native Thumbnail Pipeline",
     version="0.1.0",
 )
+
+storage = create_object_storage()
 
 MAX_THUMBNAIL_SIZE = (320, 320)
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024
@@ -49,6 +55,15 @@ async def create_thumbnail(file: UploadFile = File(...)) -> StreamingResponse:
             detail="Unsupported image format",
         )
 
+    image_id = uuid4()
+    extension = image.format.lower()
+
+    storage.put_object(
+        original_key(image_id, extension),
+        BytesIO(image_data),
+        f"image/{extension}",
+    )
+
     image.thumbnail(MAX_THUMBNAIL_SIZE)
 
     output = BytesIO()
@@ -59,6 +74,12 @@ async def create_thumbnail(file: UploadFile = File(...)) -> StreamingResponse:
 
     image.save(output, format=output_format)
     output.seek(0)
+
+    storage.put_object(
+        thumbnail_key(image_id, extension),
+        BytesIO(output.getvalue()),
+        f"image/{extension}",
+    )
 
     media_type = f"image/{output_format.lower()}"
 
