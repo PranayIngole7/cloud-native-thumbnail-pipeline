@@ -5,6 +5,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from PIL import Image, UnidentifiedImageError
 
+from .storage.exceptions import StorageError
 from .storage.factory import create_object_storage
 from .storage.object_keys import original_key, thumbnail_key
 
@@ -60,13 +61,19 @@ async def create_thumbnail(file: UploadFile = File(...)) -> StreamingResponse:
 
     original_object_key = original_key(image_id, extension)
 
-    storage.put_object(
-        original_object_key,
-        BytesIO(image_data),
-        f"image/{extension}",
-    )
+    try:
+        storage.put_object(
+            original_object_key,
+            BytesIO(image_data),
+            f"image/{extension}",
+        )
 
-    stored_original = storage.get_object(original_object_key)
+        stored_original = storage.get_object(original_object_key)
+    except StorageError:
+        raise HTTPException(
+            status_code=503,
+            detail="Object storage is temporarily unavailable",
+        )
 
     image = Image.open(BytesIO(stored_original))
     image.load()
@@ -82,11 +89,17 @@ async def create_thumbnail(file: UploadFile = File(...)) -> StreamingResponse:
     image.save(output, format=output_format)
     output.seek(0)
 
-    storage.put_object(
-        thumbnail_key(image_id, extension),
-        BytesIO(output.getvalue()),
-        f"image/{extension}",
-    )
+    try:
+        storage.put_object(
+            thumbnail_key(image_id, extension),
+            BytesIO(output.getvalue()),
+            f"image/{extension}",
+        )
+    except StorageError:
+        raise HTTPException(
+            status_code=503,
+            detail="Object storage is temporarily unavailable",
+        )
 
     media_type = f"image/{output_format.lower()}"
 

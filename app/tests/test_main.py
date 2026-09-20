@@ -1,10 +1,12 @@
 from io import BytesIO
+from typing import BinaryIO
 
 from fastapi.testclient import TestClient
 from PIL import Image
 
 import src.main as main
 from src.main import app
+from src.storage.exceptions import StorageError
 from test_storage import InMemoryObjectStorage
 
 
@@ -18,6 +20,35 @@ class TrackingObjectStorage(InMemoryObjectStorage):
         self.get_calls.append(object_key)
         return super().get_object(object_key)
 
+class FailingPutStorage(InMemoryObjectStorage):
+
+    def put_object(
+        self,
+        object_key: str,
+        data: BinaryIO,
+        content_type: str,
+    ) -> None:
+        raise StorageError("storage unavailable")
+
+
+class FailingGetStorage(InMemoryObjectStorage):
+
+    def get_object(self, object_key: str) -> bytes:
+        raise StorageError("storage unavailable")
+
+
+class FailingThumbnailPutStorage(InMemoryObjectStorage):
+
+    def put_object(
+        self,
+        object_key: str,
+        data: BinaryIO,
+        content_type: str,
+    ) -> None:
+        if object_key.startswith("thumbnails/"):
+            raise StorageError("storage unavailable")
+
+        super().put_object(object_key, data, content_type)
 
 client = TestClient(app)
 
@@ -358,3 +389,63 @@ def test_reject_oversized_upload():
     assert response.json() == {
         "detail": "Uploaded file is too large"
     }
+
+def test_storage_put_failure_returns_503():
+    main.storage = FailingPutStorage()
+
+    image = create_test_image()
+
+    response = client.post(
+        "/thumbnails",
+        files={"file": ("test.png", image, "image/png")},
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Object storage is temporarily unavailable"
+    }
+
+    main.storage = test_storage
+    clear_storage()
+
+
+def test_storage_get_failure_returns_503():
+    storage = FailingGetStorage()
+
+    image = create_test_image()
+
+    main.storage = storage
+
+    response = client.post(
+        "/thumbnails",
+        files={"file": ("test.png", image, "image/png")},
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Object storage is temporarily unavailable"
+    }
+
+    main.storage = test_storage
+    clear_storage()
+
+
+def test_thumbnail_storage_put_failure_returns_503():
+    storage = FailingThumbnailPutStorage()
+
+    image = create_test_image()
+
+    main.storage = storage
+
+    response = client.post(
+        "/thumbnails",
+        files={"file": ("test.png", image, "image/png")},
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Object storage is temporarily unavailable"
+    }
+
+    main.storage = test_storage
+    clear_storage()

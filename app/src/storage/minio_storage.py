@@ -2,6 +2,7 @@ from typing import BinaryIO
 
 from minio import Minio
 
+from .exceptions import StorageError
 from .object_storage import ObjectStorage
 
 
@@ -32,23 +33,34 @@ class MinioObjectStorage(ObjectStorage):
     ) -> None:
         data.seek(0)
 
-        self.client.put_object(
-            self.bucket_name,
-            object_key,
-            data,
-            length=-1,
-            part_size=10 * 1024 * 1024,
-            content_type=content_type,
-        )
+        try:
+            self.client.put_object(
+                self.bucket_name,
+                object_key,
+                data,
+                length=-1,
+                part_size=10 * 1024 * 1024,
+                content_type=content_type,
+            )
+        except Exception as exc:
+            raise StorageError(
+                "Object storage put operation failed"
+            ) from exc
 
     def get_object(self, object_key: str) -> bytes:
-        response = self.client.get_object(
-            self.bucket_name,
-            object_key,
-        )
-
         try:
-            return response.read()
-        finally:
-            response.close()
-            response.release_conn()
+            response = self.client.get_object(
+                self.bucket_name,
+                object_key,
+            )
+
+            try:
+                return response.read()
+            finally:
+                response.close()
+                response.release_conn()
+
+        except Exception as exc:
+            raise StorageError(
+                "Object storage get operation failed"
+            ) from exc
