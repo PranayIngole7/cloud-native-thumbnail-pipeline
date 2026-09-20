@@ -1,8 +1,8 @@
 # Current Project Status
 
-**Date:** 18 September 2026  
-**Current Phase:** Phase 3 — MinIO Object Storage  
-**Next Step:** Phase 3.1 — MinIO Concepts & Design
+**Date:** 20 September 2026
+**Current Phase:** Phase 3 — MinIO Object Storage  ✅ COMPLETE
+**Next Step:** Phase 4 — Kubernetes Fundamentals
 
 ---
 
@@ -95,62 +95,55 @@ The latest commit represents the completion of Phase 2.
 
 ---
 
-## Phase 3 — MinIO Object Storage ⏳ NEXT
+## Phase 3 — MinIO Object Storage ✅ COMPLETE
 
 ### Objective
 
 Introduce persistent S3-compatible object storage while keeping the application itself deliberately simple.
 
-### Planned Work
+### Completed
 
-- Understand object-storage concepts and S3-compatible APIs.
-- Run MinIO locally.
-- Create and configure the required bucket.
-- Externalize storage configuration appropriately.
-- Store uploaded original images in MinIO.
-- Generate thumbnails from stored images.
-- Store generated thumbnails in MinIO.
-- Add storage-related error handling.
-- Test missing objects and storage failures.
-- Document MinIO configuration and local setup.
+- Completed MinIO concepts and storage architecture design.
+- Added MinIO to Docker Compose for local object storage.
+- Added persistent MinIO storage using a Docker volume.
+- Added automatic creation of the `thumbnail-pipeline` bucket.
+- Externalized MinIO configuration through environment variables.
+- Added an object-storage abstraction separate from the MinIO implementation.
+- Stored uploaded original images in MinIO.
+- Retrieved original images from MinIO before thumbnail processing.
+- Generated thumbnails using Pillow.
+- Stored generated thumbnails in MinIO.
+- Added storage-specific failure handling using `StorageError`.
+- Mapped object-storage failures to HTTP `503 Service Unavailable`.
+- Added automated tests for storage PUT and GET failures.
+- Verified normal processing, storage failure, and recovery using Docker and MinIO.
+- Verified persistent original and thumbnail objects in MinIO.
 
-### Target Flow
+### Verification
 
-```text
-Client
-   |
-   v
-FastAPI
-   |
-   | store original
-   v
-MinIO
-   |
-   | process image
-   v
-Thumbnail
-   |
-   | store result
-   v
-MinIO
-```
-
-### Exit Criteria
-
-The complete flow works reliably:
+Application regression:
 
 ```text
-Original Image
-      ↓
-    MinIO
-      ↓
-Thumbnail Generation
-      ↓
-Thumbnail
-      ↓
-    MinIO
+19 passed
 ```
 
-**Current next step:** Phase 3.1 — MinIO Concepts & Design.
+### Docker Verification:
+```text
+Application container     healthy
+MinIO                     running
+Normal thumbnail flow     passed
+MinIO failure handling    HTTP 503
+MinIO recovery             passed
+Thumbnail validation       320 × 320 PNG
+Object persistence         verified
+```
 
-No MinIO implementation work has been started yet.
+### Important MinIO Checkpoints:
+```text
+dd0557f  feat: add local MinIO infrastructure
+9ff3912  feat: integrate MinIO object storage
+4ecf960  feat: integrate thumbnail processing with MinIO
+96dc8be  feat: harden object storage failure handling
+```
+The latest commit represents the completion of Phase 2.
+---

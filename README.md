@@ -2,7 +2,7 @@
 
 A small image-processing service designed to demonstrate modern DevOps and cloud-native engineering practices.
 
-The application accepts an image, stores the original in object storage, generates a thumbnail using Pillow, and stores the resulting thumbnail. The application itself remains deliberately small so that the project can focus on containerization, Kubernetes, serverless-style serving, CI/CD, GitOps, observability, security, and failure testing.
+The application accepts an image, stores the original in MinIO object storage, retrieves it for Pillow-based thumbnail processing, and stores the generated thumbnail back in MinIO. The application remains deliberately small so the project can focus on containerization, object storage, Kubernetes, CI/CD, observability, security, and failure testing.
 
 > **Core principle:** The application stays deliberately small; the infrastructure and operational engineering provide the depth.
 
@@ -10,28 +10,41 @@ The application accepts an image, stores the original in object storage, generat
 
 ## Overview
 
-The project implements a containerized thumbnail-processing API using Python and FastAPI.
+The project currently provides a containerized thumbnail-processing API using Python and FastAPI.
 
-The platform around the application demonstrates:
+### Implemented
 
+- FastAPI application
+- Pillow-based image processing
 - Docker containerization
+- Non-root application container
+- Docker healthcheck
+- MinIO S3-compatible object storage
+- Persistent object storage using Docker volumes
+- Original and thumbnail object persistence
+- Storage abstraction and failure handling
+- Automated application tests
+- Docker-based failure and recovery verification
+
+### Planned Platform Extensions
+
+The project will progressively introduce:
+
 - Kubernetes orchestration
 - Minikube for local Kubernetes development
 - Helm-based application packaging
-- Knative Serving for serverless-style HTTP serving and scaling
-- GitHub Actions for CI
+- Knative Serving
+- GitHub Actions CI
 - Container registry integration
-- Argo CD for GitOps deployment
-- MinIO for object storage
-- OpenTelemetry for application telemetry
-- Prometheus for metrics
-- Grafana for visualization
-- Trivy for container security scanning
+- Argo CD GitOps deployment
+- OpenTelemetry
+- Prometheus
+- Grafana
+- Trivy security scanning
 - Kubernetes security controls
-- Failure and recovery testing
+- Additional failure and recovery testing
 
 The project is intentionally designed for local development and learning without requiring paid cloud infrastructure.
-
 ---
 
 ## Goals
@@ -56,14 +69,37 @@ The project is intended to demonstrate practical understanding of:
 - Kubernetes security practices
 - reproducible local environments
 
-The goal is not to build a large application.
-
 The goal is to build a **small application surrounded by realistic production-style engineering practices**.
 
 ---
 
 ## Architecture
 
+### Current Architecture
+
+```text
+Client
+   │
+   ▼
+FastAPI Application
+   │
+   ├── Validate Image
+   │
+   ├── Store Original
+   │       │
+   │       ▼
+   │     MinIO
+   │
+   ├── Retrieve Original
+   │
+   ├── Process with Pillow
+   │
+   └── Store Thumbnail
+           │
+           ▼
+         MinIO
+```
+### Planned Architecture
 ```text
 Developer
    │
@@ -120,14 +156,13 @@ The detailed architecture is documented in [`docs/architecture.md`](docs/archite
 
 ## Application Workflow
 
-The initial API design contains three endpoints:
+The current API provides three endpoints:
 
-| Endpoint | Purpose |
-|---|---|
+| Endpoint           | Purpose                                  |
+| ------------------ | ---------------------------------------- |
 | `POST /thumbnails` | Upload an image and generate a thumbnail |
-| `GET /thumbnails/{id}` | Retrieve a generated thumbnail |
-| `GET /health` | Basic process health |
-| `GET /ready` | Readiness check |
+| `GET /health`      | Basic process health                     |
+| `GET /ready`       | Application readiness                    |
 
 The thumbnail creation flow is:
 
@@ -143,6 +178,8 @@ FastAPI
   │
   ├── Store original in MinIO
   │
+  ├── Retrieve original from MinIO
+  │
   ├── Process image with Pillow
   │
   ├── Generate thumbnail
@@ -150,10 +187,8 @@ FastAPI
   └── Store thumbnail in MinIO
   │
   ▼
-Return metadata
+Return thumbnail
 ```
-
-The exact API schema and status codes will be finalized during implementation.
 
 ---
 
