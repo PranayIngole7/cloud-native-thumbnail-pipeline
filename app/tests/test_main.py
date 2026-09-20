@@ -8,14 +8,26 @@ from src.main import app
 from test_storage import InMemoryObjectStorage
 
 
+class TrackingObjectStorage(InMemoryObjectStorage):
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.get_calls: list[str] = []
+
+    def get_object(self, object_key: str) -> bytes:
+        self.get_calls.append(object_key)
+        return super().get_object(object_key)
+
+
 client = TestClient(app)
 
-test_storage = InMemoryObjectStorage()
+test_storage = TrackingObjectStorage()
 main.storage = test_storage
 
 
 def clear_storage() -> None:
     test_storage.objects.clear()
+    test_storage.get_calls.clear()
 
 def create_test_image(
     image_format: str = "PNG",
@@ -101,6 +113,25 @@ def test_create_thumbnail_stores_original_and_thumbnail():
 
     assert original_content_type == "image/png"
     assert thumbnail_content_type == "image/png"
+
+def test_thumbnail_processing_reads_original_from_storage():
+    clear_storage()
+    image = create_test_image(size=(1000, 500))
+
+    response = client.post(
+        "/thumbnails",
+        files={"file": ("test.png", image, "image/png")},
+    )
+
+    assert response.status_code == 200
+
+    assert len(test_storage.get_calls) == 1
+
+    retrieved_key = test_storage.get_calls[0]
+
+    assert retrieved_key.startswith("originals/")
+    assert retrieved_key.endswith(".png")
+    assert retrieved_key in test_storage.objects
 
 def test_failed_upload_does_not_store_objects():
     clear_storage()

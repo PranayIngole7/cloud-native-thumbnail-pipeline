@@ -58,11 +58,18 @@ async def create_thumbnail(file: UploadFile = File(...)) -> StreamingResponse:
     image_id = uuid4()
     extension = image.format.lower()
 
+    original_object_key = original_key(image_id, extension)
+
     storage.put_object(
-        original_key(image_id, extension),
+        original_object_key,
         BytesIO(image_data),
         f"image/{extension}",
     )
+
+    stored_original = storage.get_object(original_object_key)
+
+    image = Image.open(BytesIO(stored_original))
+    image.load()
 
     image.thumbnail(MAX_THUMBNAIL_SIZE)
 
