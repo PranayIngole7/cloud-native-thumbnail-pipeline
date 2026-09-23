@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: thumbnail-service
+  namespace: thumbnail-pipeline
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: thumbnail-service
+
+  template:
+    metadata:
+      labels:
+        app: thumbnail-service
+
+    spec:
+      containers:
+        - name: thumbnail-service
+          image: thumbnail-service:0.1.4
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - containerPort: 8000
+              protocol: TCP
