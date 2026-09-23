@@ -26,3 +26,7 @@ spec:
           ports:
             - containerPort: 8000
               protocol: TCP
+
+          envFrom:
+            - configMapRef:
+                name: thumbnail-service-config
