@@ -30,3 +30,6 @@ spec:
           envFrom:
             - configMapRef:
                 name: thumbnail-service-config
+
+            - secretRef:
+                name: thumbnail-service-secret
