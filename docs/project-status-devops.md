@@ -1,8 +1,8 @@
 # Current Project Status
 
-**Date:** 20 September 2026
-**Current Phase:** Phase 3 — MinIO Object Storage  ✅ COMPLETE
-**Next Step:** Phase 4 — Kubernetes Fundamentals
+**Date:** 24 September 2026
+**Current Phase:** Phase 4 — Kubernetes Deployment  ✅ COMPLETE
+**Next Step:** Phase 5 — Helm
 
 ---
 
@@ -147,3 +147,105 @@ dd0557f  feat: add local MinIO infrastructure
 ```
 The latest commit represents the completion of Phase 2.
 ---
+
+## Phase 4 — Kubernetes Deployment ✅ COMPLETE
+
+### Objective
+
+Deploy the thumbnail service and its MinIO dependency to Kubernetes while introducing core Kubernetes concepts such as Deployments, Services, ConfigMaps, Secrets, health probes, resource management, persistent storage, and internal service discovery.
+
+### Completed
+
+- Set up a local Kubernetes environment using Minikube with Docker Engine.
+- Created the `thumbnail-pipeline` Kubernetes namespace.
+- Created a Kubernetes Deployment for the thumbnail service.
+- Exposed the thumbnail service using a Kubernetes `ClusterIP` Service.
+- Added a Kubernetes ConfigMap for non-sensitive application configuration.
+- Added a Kubernetes Secret for MinIO credentials.
+- Configured the application Deployment to consume ConfigMap and Secret values using `envFrom`.
+- Added HTTP liveness and readiness probes using `/health` and `/ready`.
+- Added CPU and memory resource requests.
+- Added CPU and memory resource limits.
+- Verified Kubernetes QoS classification as `Burstable`.
+- Deployed MinIO as a Kubernetes Deployment.
+- Exposed MinIO internally using a Kubernetes `ClusterIP` Service.
+- Exposed MinIO API port `9000` and console port `9001`.
+- Added a `PersistentVolumeClaim` for MinIO data.
+- Configured MinIO to persist data under `/data` using the PVC.
+- Added a Kubernetes Job to initialize the `thumbnail-pipeline` bucket.
+- Configured the thumbnail service to connect to MinIO through Kubernetes Service DNS using `minio:9000`.
+- Verified application-to-MinIO network connectivity from the application Pod.
+- Verified MinIO authentication from the application.
+- Built and deployed `thumbnail-service:0.1.5` containing the MinIO integration.
+- Diagnosed and fixed a stale application image that did not contain the MinIO Python SDK.
+- Verified end-to-end thumbnail processing through the Kubernetes deployment.
+- Verified that uploaded originals are persisted in MinIO.
+- Verified that generated thumbnails are persisted in MinIO.
+- Verified successful Kubernetes health and readiness probe execution.
+- Protected the local MinIO credential manifest from Git tracking using `.gitignore`.
+
+### Verification
+
+Kubernetes application:
+
+```text
+Deployment rollout       passed
+Application Pod          1/1 Running
+Pod restarts             0
+Health probe             passed
+Readiness probe          passed
+ConfigMap configuration  passed
+Secret configuration     passed
+```
+
+MinIO:
+
+```text
+MinIO Pod                1/1 Running
+MinIO Service            ClusterIP
+MinIO API                :9000
+MinIO Console            :9001
+PVC                      2Gi / Bound
+Bucket initialization    passed
+Application connectivity passed
+Authentication           passed
+```
+
+End-to-end verification:
+
+```text
+POST /thumbnails         HTTP 200
+Original persistence     verified
+Thumbnail persistence   verified
+Thumbnail output        320 × 240 PNG
+```
+
+### Important Kubernetes Checkpoints
+
+```text
+19333c6  feat: add Kubernetes application deployment
+1fee69c  feat: add Kubernetes application configmap
+bbab11a  feat: expose thumbnail service on kubernetes
+331d05d  feat: add kubernetes health probes
+ad5ff77  feat: add kubernetes resource requests
+bfed24d  ops: add Kubernetes resource limits
+c860a3a  feat: deploy minio on kubernetes
+```
+
+### Important Debugging Checkpoint
+
+During end-to-end verification, the Kubernetes application returned HTTP `200`, but the MinIO bucket initially contained no objects.
+
+Investigation showed that the running Kubernetes Pod used an older application image that did not contain the MinIO Python SDK. A new image, `thumbnail-service:0.1.5`, was built, verified, loaded into Minikube, and deployed.
+
+The final verification confirmed:
+
+```text
+Application → MinIO        passed
+Original upload            passed
+Original persistence       passed
+Thumbnail generation       passed
+Thumbnail persistence      passed
+```
+---
+
