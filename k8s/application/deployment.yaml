@@ -44,11 +44,14 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 2
             failureThreshold: 3
-            
+
           resources:
             requests:
               cpu: "100m"
-              memory: "128Mi"  
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
 
           envFrom:
             - configMapRef:
