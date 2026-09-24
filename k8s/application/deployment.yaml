@@ -27,9 +27,26 @@ spec:
             - containerPort: 8000
               protocol: TCP
 
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+
           envFrom:
             - configMapRef:
                 name: thumbnail-service-config
-
             - secretRef:
                 name: thumbnail-service-secret
