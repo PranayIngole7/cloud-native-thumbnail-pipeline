@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: thumbnail-service
-          image: thumbnail-service:0.1.4
+          image: thumbnail-service:0.1.5
           imagePullPolicy: IfNotPresent
 
           ports:

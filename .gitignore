@@ -5,3 +5,6 @@ __pycache__/
 
 # Kubernetes secrets
 k8s/application/secret.yaml
+
+# Kubernetes secrets
+k8s/minio/secret.yaml
