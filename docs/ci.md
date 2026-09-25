@@ -122,5 +122,4 @@ The CI pipeline currently provides:
 7. Pull request validation 
 8. Push-to-main validation
 
-Container registry publishing and GitOps deployment are not part of the current CI workflow.
----
+**Container registry publishing and GitOps deployment are not part of the current CI workflow.**
