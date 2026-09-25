@@ -67,7 +67,7 @@ jobs:
 
           test "$(docker inspect \
             --format '{{.State.Health.Status}}' \
-            thumbnail-service-ci-test)" = "broken"
+            thumbnail-service-ci-test)" = "healthy"
 
           docker stop thumbnail-service-ci-test
           docker rm thumbnail-service-ci-test
