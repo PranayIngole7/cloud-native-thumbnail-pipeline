@@ -32,7 +32,15 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r app/requirements.txt
 
+      - name: Verify dependencies
+        run: |
+          python -m pip list
+
       - name: Run tests
         working-directory: app
         run: |
           python -m pytest -q
+
+      - name: Build Docker image
+        run: |
+          docker build -t thumbnail-service:ci ./app
