@@ -1,6 +1,6 @@
 # Cloud-Native Thumbnail Pipeline
 
-A small image-processing service designed to demonstrate practical DevOps and cloud-native engineering and cloud-native engineering practices.
+A small image-processing service designed to demonstrate modern DevOps and cloud-native engineering practices.
 
 The application accepts an image, stores the original in MinIO object storage, retrieves it for Pillow-based thumbnail processing, and stores the generated thumbnail back in MinIO. The application remains deliberately small so the project can focus on containerization, object storage, Kubernetes, CI/CD, observability, security, and failure testing.
 
