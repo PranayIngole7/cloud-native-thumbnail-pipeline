@@ -45,3 +45,29 @@ jobs:
         run: |
           IMAGE_TAG=${GITHUB_SHA::7}
           docker build -t thumbnail-service:${IMAGE_TAG} ./app
+
+      - name: Validate Docker image
+        run: |
+          IMAGE_TAG=${GITHUB_SHA::7}
+
+          docker image inspect thumbnail-service:${IMAGE_TAG}
+
+          docker run -d \
+            --name thumbnail-service-ci-test \
+            -p 8000:8000 \
+            thumbnail-service:${IMAGE_TAG}
+
+          sleep 10
+
+          docker ps
+
+          docker inspect \
+            --format '{{.State.Health.Status}}' \
+            thumbnail-service-ci-test
+
+          test "$(docker inspect \
+            --format '{{.State.Health.Status}}' \
+            thumbnail-service-ci-test)" = "healthy"
+
+          docker stop thumbnail-service-ci-test
+          docker rm thumbnail-service-ci-test
