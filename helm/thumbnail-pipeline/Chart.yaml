@@ -1,0 +1,8 @@
+apiVersion: v2
+name: thumbnail-pipeline
+description: Helm chart for the Cloud-Native Thumbnail Pipeline
+
+type: application
+
+version: 0.1.0
+appVersion: "0.1.5"

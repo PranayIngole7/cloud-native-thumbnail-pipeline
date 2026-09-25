@@ -1,0 +1,54 @@
+# Number of thumbnail-service replicas
+replicaCount: 1
+
+# Thumbnail application
+image:
+  repository: thumbnail-service
+  tag: "0.1.5"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# Application configuration
+config:
+  minioEndpoint: "minio:9000"
+  minioBucket: "thumbnail-pipeline"
+  minioSecure: "false"
+
+# Development credentials.
+# Production deployments should use externally managed secrets.
+secrets:
+  minioRootUser: ""
+  minioRootPassword: ""
+
+# MinIO
+minio:
+  image:
+    repository: quay.io/minio/minio
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  service:
+    apiPort: 9000
+    consolePort: 9001
+
+  storage:
+    size: 2Gi
+
+# MinIO initialization job
+minioInit:
+  image:
+    repository: quay.io/minio/mc
+    tag: "latest"
+
+  backoffLimit: 5

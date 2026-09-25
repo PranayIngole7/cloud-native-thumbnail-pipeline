@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: thumbnail-service
+  namespace: "{{ .Release.Namespace }}"
+  labels:
+    {{- include "thumbnail-pipeline.labels" . | nindent 4 }}
+
+spec:
+  replicas: {{ .Values.replicaCount }}
+
+  selector:
+    matchLabels:
+      {{- include "thumbnail-pipeline.applicationSelectorLabels" . | nindent 6 }}
+
+  template:
+    metadata:
+      labels:
+        {{- include "thumbnail-pipeline.applicationSelectorLabels" . | nindent 8 }}
+
+    spec:
+      containers:
+        - name: thumbnail-service
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          ports:
+            - containerPort: 8000
+              protocol: TCP
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+          resources:
+            requests:
+              cpu: "{{ .Values.resources.requests.cpu }}"
+              memory: "{{ .Values.resources.requests.memory }}"
+            limits:
+              cpu: "{{ .Values.resources.limits.cpu }}"
+              memory: "{{ .Values.resources.limits.memory }}"
+
+          envFrom:
+            - configMapRef:
+                name: thumbnail-service-config
+            - secretRef:
+                name: thumbnail-service-secret

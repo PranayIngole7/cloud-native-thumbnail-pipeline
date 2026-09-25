@@ -8,3 +8,8 @@ k8s/application/secret.yaml
 
 # Kubernetes secrets
 k8s/minio/secret.yaml
+
+# Helm local development secrets
+helm/thumbnail-pipeline/values.local.yaml
+
+
