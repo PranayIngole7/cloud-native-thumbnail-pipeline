@@ -1,8 +1,8 @@
 # Current Project Status
 
 **Date:** 25 September 2026
-**Current Phase:** Phase 5 — Helm  ✅ COMPLETE
-**Next Step:** Phase 6 — Knative Serving
+**Current Phase:** Phase 6 — Knative Serving  ✅ COMPLETE
+**Next Step:** Phase 7 — CI with GitHub Actions
 
 ---
 
@@ -229,3 +229,39 @@ A reusable Helm chart that supports predictable:
 **Install → Upgrade → Rollback**
 
 ---
+
+# Phase 6 — Knative Serving
+
+**Status: ✅ COMPLETE**
+
+**Objective:** Introduce serverless/container-based application serving and understand scale-to-zero/event-driven deployment concepts.
+
+### Work
+1. Knative concepts
+2. Knative Serving architecture
+3. Install/configure Knative locally
+4. Create Knative Service
+5. Replace/compare Kubernetes Deployment serving
+6. Revision management
+7. Traffic routing
+8. Autoscaling
+9. Scale-to-zero
+10. Cold-start behavior
+11. Request testing
+12. Failure testing
+13. Recovery testing
+14. Document trade-offs
+
+### Verification
+- Knative Service deploys
+- Revision is ready
+- Application receives requests
+- Autoscaling works
+- Scale-to-zero behavior is observed
+- Application recovers correctly
+
+### Exit Criterion
+The thumbnail service can be deployed and operated using Knative Serving with demonstrated autoscaling behavior.
+
+---
+
