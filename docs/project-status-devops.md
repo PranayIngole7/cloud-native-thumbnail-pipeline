@@ -265,3 +265,37 @@ The thumbnail service can be deployed and operated using Knative Serving with de
 
 ---
 
+# Phase 7 — CI with GitHub Actions
+
+**Status: ✅ COMPLETE**
+
+**Objective:** Automate build, test, containerization and validation through CI.
+
+### Work
+1. CI/CD concepts
+2. GitHub Actions concepts
+3. Workflow structure
+4. Trigger configuration
+5. Python environment setup
+6. Dependency installation
+7. Automated tests
+8. Docker build
+9. Image tagging
+10. Security/basic validation
+11. Workflow failure handling
+12. Pull-request validation
+13. Branch/push workflow
+14. CI documentation
+
+### Verification
+- Workflow triggers correctly
+- Dependencies install
+- Tests run automatically
+- Docker image builds
+- Failed tests fail the pipeline
+- Successful changes pass CI
+
+### Exit Criterion
+Every relevant code change is automatically validated through CI.
+
+---
