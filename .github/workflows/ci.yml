@@ -43,4 +43,5 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t thumbnail-service:ci ./app
+          IMAGE_TAG=${GITHUB_SHA::7}
+          docker build -t thumbnail-service:${IMAGE_TAG} ./app
