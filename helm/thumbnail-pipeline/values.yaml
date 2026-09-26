@@ -28,6 +28,7 @@ config:
 # Development credentials.
 # Production deployments should use externally managed secrets.
 secrets:
+  create: false
   minioRootUser: ""
   minioRootPassword: ""
 
