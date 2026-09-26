@@ -1,7 +1,9 @@
 import logging
 import time
+import os
 from io import BytesIO
 from uuid import uuid4
+
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
@@ -12,15 +14,49 @@ from .storage.exceptions import StorageError
 from .storage.factory import create_object_storage
 from .storage.object_keys import original_key, thumbnail_key
 
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.trace import TracerProvider
+
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
 
 logger = logging.getLogger(__name__)
 
+resource = Resource.create(
+    {
+        "service.name": "thumbnail-service",
+        "service.version": "0.1.0",
+    }
+)
+
+tracer_provider = TracerProvider(resource=resource)
+
+otlp_endpoint = os.getenv(
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "http://localhost:4317",
+)
+
+otlp_exporter = OTLPSpanExporter(
+    endpoint=otlp_endpoint,
+    insecure=True,
+)
+
+tracer_provider.add_span_processor(
+    BatchSpanProcessor(otlp_exporter)
+)
+
+trace.set_tracer_provider(tracer_provider)
 
 app = FastAPI(
     title="Cloud-Native Thumbnail Pipeline",
     version="0.1.0",
 )
 
+FastAPIInstrumentor.instrument_app(app)
 
 thumbnail_requests_total = Counter(
     "thumbnail_requests_total",

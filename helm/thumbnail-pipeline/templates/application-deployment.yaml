@@ -60,3 +60,7 @@ spec:
                 name: thumbnail-service-config
             - secretRef:
                 name: thumbnail-service-secret
+          
+          env:
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "{{ .Values.tracing.otlpEndpoint }}"

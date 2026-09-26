@@ -4,8 +4,12 @@ replicaCount: 1
 # Thumbnail application
 image:
   repository: thumbnail-service
-  tag: "0.1.7"
+  tag: "0.1.8"
   pullPolicy: IfNotPresent
+
+tracing:
+  enabled: true
+  otlpEndpoint: "http://jaeger:4317"
 
 service:
   type: ClusterIP
