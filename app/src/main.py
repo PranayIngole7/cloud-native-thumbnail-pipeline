@@ -1,18 +1,63 @@
-from uuid import uuid4
+import time
 from io import BytesIO
+from uuid import uuid4
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from PIL import Image, UnidentifiedImageError
+from prometheus_client import Counter, Histogram, make_asgi_app
 
 from .storage.exceptions import StorageError
 from .storage.factory import create_object_storage
 from .storage.object_keys import original_key, thumbnail_key
 
+
 app = FastAPI(
     title="Cloud-Native Thumbnail Pipeline",
     version="0.1.0",
 )
+
+
+thumbnail_requests_total = Counter(
+    "thumbnail_requests_total",
+    "Total number of thumbnail pipeline HTTP requests",
+)
+
+thumbnail_errors_total = Counter(
+    "thumbnail_errors_total",
+    "Total number of failed thumbnail pipeline HTTP requests",
+)
+
+thumbnail_request_duration_seconds = Histogram(
+    "thumbnail_request_duration_seconds",
+    "Time spent processing thumbnail pipeline HTTP requests",
+)
+
+
+@app.middleware("http")
+async def metrics_middleware(request, call_next):
+    if request.url.path in {"/metrics", "/metrics/"}:
+        return await call_next(request)
+
+    start_time = time.perf_counter()
+
+    response = await call_next(request)
+
+    thumbnail_requests_total.inc()
+
+    if response.status_code >= 400:
+        thumbnail_errors_total.inc()
+
+    thumbnail_request_duration_seconds.observe(
+        time.perf_counter() - start_time
+    )
+
+    return response
+
+
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
+
 
 storage = create_object_storage()
 

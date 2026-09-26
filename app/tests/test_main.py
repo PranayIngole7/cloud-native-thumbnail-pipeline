@@ -449,3 +449,108 @@ def test_thumbnail_storage_put_failure_returns_503():
 
     main.storage = test_storage
     clear_storage()
+
+def test_metrics_endpoint_exposes_application_metrics():
+    response = client.get("/metrics/")
+
+    assert response.status_code == 200
+    assert "text/plain" in response.headers["content-type"]
+
+    body = response.text
+
+    assert "thumbnail_requests_total" in body
+    assert "thumbnail_errors_total" in body
+    assert "thumbnail_request_duration_seconds" in body
+
+
+def test_metrics_request_counter_increments():
+    before = client.get("/metrics/").text
+
+    def metric_value(metrics_text: str, metric_name: str) -> float:
+        for line in metrics_text.splitlines():
+            if line.startswith(f"{metric_name} "):
+                return float(line.split()[1])
+        raise AssertionError(f"{metric_name} not found")
+
+    before_value = metric_value(
+        before,
+        "thumbnail_requests_total",
+    )
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+
+    after = client.get("/metrics/").text
+
+    after_value = metric_value(
+        after,
+        "thumbnail_requests_total",
+    )
+
+    assert after_value == before_value + 1
+
+
+def test_metrics_error_counter_increments():
+    before = client.get("/metrics/").text
+
+    def metric_value(metrics_text: str, metric_name: str) -> float:
+        for line in metrics_text.splitlines():
+            if line.startswith(f"{metric_name} "):
+                return float(line.split()[1])
+        raise AssertionError(f"{metric_name} not found")
+
+    before_value = metric_value(
+        before,
+        "thumbnail_errors_total",
+    )
+
+    response = client.post(
+        "/thumbnails",
+        files={
+            "file": (
+                "not-an-image.txt",
+                b"not an image",
+                "text/plain",
+            )
+        },
+    )
+
+    assert response.status_code == 400
+
+    after = client.get("/metrics/").text
+
+    after_value = metric_value(
+        after,
+        "thumbnail_errors_total",
+    )
+
+    assert after_value == before_value + 1
+
+
+def test_metrics_duration_histogram_records_request():
+    before = client.get("/metrics/").text
+
+    def metric_value(metrics_text: str, metric_name: str) -> float:
+        for line in metrics_text.splitlines():
+            if line.startswith(f"{metric_name} "):
+                return float(line.split()[1])
+        raise AssertionError(f"{metric_name} not found")
+
+    before_value = metric_value(
+        before,
+        "thumbnail_request_duration_seconds_count",
+    )
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+
+    after = client.get("/metrics/").text
+
+    after_value = metric_value(
+        after,
+        "thumbnail_request_duration_seconds_count",
+    )
+
+    assert after_value == before_value + 1
