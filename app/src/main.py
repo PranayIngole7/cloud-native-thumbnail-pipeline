@@ -1,3 +1,4 @@
+import logging
 import time
 from io import BytesIO
 from uuid import uuid4
@@ -10,6 +11,9 @@ from prometheus_client import Counter, Histogram, make_asgi_app
 from .storage.exceptions import StorageError
 from .storage.factory import create_object_storage
 from .storage.object_keys import original_key, thumbnail_key
+
+
+logger = logging.getLogger(__name__)
 
 
 app = FastAPI(
@@ -75,12 +79,32 @@ def health() -> dict[str, str]:
 def ready() -> dict[str, str]:
     return {"status": "ready"}
 
-
 @app.post("/thumbnails")
 async def create_thumbnail(file: UploadFile = File(...)) -> StreamingResponse:
+    request_id = str(uuid4())
+
+    logger.info(
+        "thumbnail request received request_id=%s filename=%s content_type=%s",
+        request_id,
+        file.filename,
+        file.content_type,
+    )
+
     image_data = await file.read()
 
+    logger.info(
+        "upload read request_id=%s size_bytes=%d",
+        request_id,
+        len(image_data),
+    )
+
     if len(image_data) > MAX_UPLOAD_SIZE:
+        logger.warning(
+            "upload rejected request_id=%s reason=file_too_large size_bytes=%d",
+            request_id,
+            len(image_data),
+        )
+
         raise HTTPException(
             status_code=413,
             detail="Uploaded file is too large",
@@ -90,12 +114,23 @@ async def create_thumbnail(file: UploadFile = File(...)) -> StreamingResponse:
         image = Image.open(BytesIO(image_data))
         image.load()
     except (UnidentifiedImageError, OSError):
+        logger.warning(
+            "upload rejected request_id=%s reason=invalid_image",
+            request_id,
+        )
+
         raise HTTPException(
             status_code=400,
             detail="Uploaded file is not a valid image",
         )
 
     if image.format not in SUPPORTED_FORMATS:
+        logger.warning(
+            "upload rejected request_id=%s reason=unsupported_format format=%s",
+            request_id,
+            image.format,
+        )
+
         raise HTTPException(
             status_code=400,
             detail="Unsupported image format",
@@ -103,6 +138,13 @@ async def create_thumbnail(file: UploadFile = File(...)) -> StreamingResponse:
 
     image_id = uuid4()
     extension = image.format.lower()
+
+    logger.info(
+        "image validated request_id=%s image_id=%s format=%s",
+        request_id,
+        image_id,
+        image.format,
+    )
 
     original_object_key = original_key(image_id, extension)
 
@@ -113,8 +155,27 @@ async def create_thumbnail(file: UploadFile = File(...)) -> StreamingResponse:
             f"image/{extension}",
         )
 
+        logger.info(
+            "original image stored request_id=%s image_id=%s",
+            request_id,
+            image_id,
+        )
+
         stored_original = storage.get_object(original_object_key)
+
+        logger.info(
+            "original image retrieved request_id=%s image_id=%s",
+            request_id,
+            image_id,
+        )
+
     except StorageError:
+        logger.exception(
+            "object storage failure request_id=%s image_id=%s stage=original",
+            request_id,
+            image_id,
+        )
+
         raise HTTPException(
             status_code=503,
             detail="Object storage is temporarily unavailable",
@@ -134,19 +195,45 @@ async def create_thumbnail(file: UploadFile = File(...)) -> StreamingResponse:
     image.save(output, format=output_format)
     output.seek(0)
 
+    logger.info(
+        "thumbnail generated request_id=%s image_id=%s format=%s",
+        request_id,
+        image_id,
+        output_format,
+    )
+
     try:
         storage.put_object(
             thumbnail_key(image_id, extension),
             BytesIO(output.getvalue()),
             f"image/{extension}",
         )
+
+        logger.info(
+            "thumbnail stored request_id=%s image_id=%s",
+            request_id,
+            image_id,
+        )
+
     except StorageError:
+        logger.exception(
+            "object storage failure request_id=%s image_id=%s stage=thumbnail",
+            request_id,
+            image_id,
+        )
+
         raise HTTPException(
             status_code=503,
             detail="Object storage is temporarily unavailable",
         )
 
     media_type = f"image/{output_format.lower()}"
+
+    logger.info(
+        "thumbnail request completed request_id=%s image_id=%s",
+        request_id,
+        image_id,
+    )
 
     return StreamingResponse(
         output,
