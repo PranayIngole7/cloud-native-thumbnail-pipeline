@@ -19,9 +19,10 @@ from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExport
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.sdk.trace import TracerProvider
-
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+
+
 
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,7 @@ tracer_provider.add_span_processor(
 )
 
 trace.set_tracer_provider(tracer_provider)
+tracer = trace.get_tracer("thumbnail-service")
 
 app = FastAPI(
     title="Cloud-Native Thumbnail Pipeline",
@@ -146,31 +148,41 @@ async def create_thumbnail(file: UploadFile = File(...)) -> StreamingResponse:
             detail="Uploaded file is too large",
         )
 
-    try:
-        image = Image.open(BytesIO(image_data))
-        image.load()
-    except (UnidentifiedImageError, OSError):
-        logger.warning(
-            "upload rejected request_id=%s reason=invalid_image",
-            request_id,
-        )
+    with tracer.start_as_current_span("image.validation") as span:
+        span.set_attribute("image.size_bytes", len(image_data))
 
-        raise HTTPException(
-            status_code=400,
-            detail="Uploaded file is not a valid image",
-        )
+        try:
+            image = Image.open(BytesIO(image_data))
+            image.load()
+        except (UnidentifiedImageError, OSError):
+            span.set_attribute("validation.success", False)
+            logger.warning(
+                "upload rejected request_id=%s reason=invalid_image",
+                request_id,
+            )
 
-    if image.format not in SUPPORTED_FORMATS:
-        logger.warning(
-            "upload rejected request_id=%s reason=unsupported_format format=%s",
-            request_id,
-            image.format,
-        )
+            raise HTTPException(
+                status_code=400,
+                detail="Uploaded file is not a valid image",
+            )
 
-        raise HTTPException(
-            status_code=400,
-            detail="Unsupported image format",
-        )
+        if image.format not in SUPPORTED_FORMATS:
+            span.set_attribute("validation.success", False)
+            span.set_attribute("image.format", image.format or "unknown")
+
+            logger.warning(
+                "upload rejected request_id=%s reason=unsupported_format format=%s",
+                request_id,
+                image.format,
+            )
+
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported image format",
+            )
+
+        span.set_attribute("validation.success", True)
+        span.set_attribute("image.format", image.format)
 
     image_id = uuid4()
     extension = image.format.lower()
@@ -185,11 +197,18 @@ async def create_thumbnail(file: UploadFile = File(...)) -> StreamingResponse:
     original_object_key = original_key(image_id, extension)
 
     try:
-        storage.put_object(
-            original_object_key,
-            BytesIO(image_data),
-            f"image/{extension}",
-        )
+        with tracer.start_as_current_span("minio.put_original") as span:
+            span.set_attribute("image.id", str(image_id))
+            span.set_attribute("storage.object_key", original_object_key)
+            span.set_attribute("image.size_bytes", len(image_data))
+
+            storage.put_object(
+                original_object_key,
+                BytesIO(image_data),
+                f"image/{extension}",
+            )
+
+            span.set_attribute("storage.success", True)
 
         logger.info(
             "original image stored request_id=%s image_id=%s",
@@ -197,7 +216,14 @@ async def create_thumbnail(file: UploadFile = File(...)) -> StreamingResponse:
             image_id,
         )
 
-        stored_original = storage.get_object(original_object_key)
+        with tracer.start_as_current_span("minio.get_original") as span:
+            span.set_attribute("image.id", str(image_id))
+            span.set_attribute("storage.object_key", original_object_key)
+
+            stored_original = storage.get_object(original_object_key)
+
+            span.set_attribute("storage.success", True)
+            span.set_attribute("storage.bytes_read", len(stored_original))
 
         logger.info(
             "original image retrieved request_id=%s image_id=%s",
@@ -217,33 +243,56 @@ async def create_thumbnail(file: UploadFile = File(...)) -> StreamingResponse:
             detail="Object storage is temporarily unavailable",
         )
 
-    image = Image.open(BytesIO(stored_original))
-    image.load()
+    with tracer.start_as_current_span("thumbnail.generation") as span:
+        span.set_attribute("image.id", str(image_id))
+        span.set_attribute("thumbnail.max_width", MAX_THUMBNAIL_SIZE[0])
+        span.set_attribute("thumbnail.max_height", MAX_THUMBNAIL_SIZE[1])
 
-    image.thumbnail(MAX_THUMBNAIL_SIZE)
+        image = Image.open(BytesIO(stored_original))
+        image.load()
 
-    output = BytesIO()
+        original_width, original_height = image.size
 
-    output_format = image.format
-    if output_format == "JPEG":
-        image = image.convert("RGB")
+        image.thumbnail(MAX_THUMBNAIL_SIZE)
 
-    image.save(output, format=output_format)
-    output.seek(0)
+        output = BytesIO()
 
-    logger.info(
-        "thumbnail generated request_id=%s image_id=%s format=%s",
-        request_id,
-        image_id,
-        output_format,
-    )
+        output_format = image.format
+        if output_format == "JPEG":
+            image = image.convert("RGB")
+
+        image.save(output, format=output_format)
+        output.seek(0)
+
+        span.set_attribute("image.original_width", original_width)
+        span.set_attribute("image.original_height", original_height)
+        span.set_attribute("thumbnail.width", image.width)
+        span.set_attribute("thumbnail.height", image.height)
+        span.set_attribute("thumbnail.format", output_format)
+
+        logger.info(
+            "thumbnail generated request_id=%s image_id=%s format=%s",
+            request_id,
+            image_id,
+            output_format,
+        )
 
     try:
-        storage.put_object(
-            thumbnail_key(image_id, extension),
-            BytesIO(output.getvalue()),
-            f"image/{extension}",
-        )
+        with tracer.start_as_current_span("minio.put_thumbnail") as span:
+            thumbnail_object_key = thumbnail_key(image_id, extension)
+            thumbnail_data = output.getvalue()
+
+            span.set_attribute("image.id", str(image_id))
+            span.set_attribute("storage.object_key", thumbnail_object_key)
+            span.set_attribute("thumbnail.size_bytes", len(thumbnail_data))
+
+            storage.put_object(
+                thumbnail_object_key,
+                BytesIO(thumbnail_data),
+                f"image/{extension}",
+            )
+
+            span.set_attribute("storage.success", True)
 
         logger.info(
             "thumbnail stored request_id=%s image_id=%s",
