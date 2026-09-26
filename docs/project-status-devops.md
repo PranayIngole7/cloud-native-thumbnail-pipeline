@@ -299,3 +299,38 @@ The thumbnail service can be deployed and operated using Knative Serving with de
 Every relevant code change is automatically validated through CI.
 
 ---
+
+# Phase 8 — Argo CD & GitOps
+
+**Status: ✅ COMPLETE**
+
+**Objective:** Introduce GitOps-based continuous delivery and declarative Kubernetes deployment.
+
+### Work
+1. GitOps concepts
+2. Argo CD architecture
+3. Install Argo CD
+4. Repository structure for GitOps
+5. Application definition
+6. Connect Git repository
+7. Sync application
+8. Automated/manual synchronization
+9. Drift detection
+10. Self-healing
+11. Deployment updates through Git
+12. Rollback/recovery
+13. GitOps documentation
+
+### Verification
+- Argo CD connects to repository
+- Application becomes Synced
+- Git changes trigger deployment updates
+- Drift is detected
+- Self-healing works
+- Rollback/recovery is demonstrated
+
+### Exit Criterion
+Kubernetes deployment is managed declaratively through Git and Argo CD.
+
+---
+
