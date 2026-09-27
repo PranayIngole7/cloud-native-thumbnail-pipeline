@@ -1,59 +1,97 @@
 # Security
 
-The thumbnail pipeline applies Kubernetes and container security controls following least-privilege principles.
+The Cloud-Native Thumbnail Pipeline applies container and Kubernetes
+security controls based on least-privilege principles.
+
+The security implementation focuses on reducing container privileges,
+restricting unnecessary network access, protecting credentials, and
+scanning the application image for known vulnerabilities.
 
 ## Security Controls
 
 ### Container Security
 
-The application container:
+The thumbnail service container is configured to:
 
-* Runs as a non-root user (`UID/GID 1000`)
-* Uses Kubernetes `runAsNonRoot`
-* Uses `seccompProfile: RuntimeDefault`
-* Disables privilege escalation
-* Drops all Linux capabilities
-* Does not require a Kubernetes service-account token
+* run as a non-root user with UID/GID `1000`
+* use Kubernetes `runAsNonRoot`
+* use `seccompProfile: RuntimeDefault`
+* disable privilege escalation
+* drop all Linux capabilities
+* disable automatic ServiceAccount token mounting
+
+These controls reduce the privileges available to the application
+process inside the Kubernetes workload.
 
 ### Kubernetes Security
 
-The `thumbnail-pipeline` namespace uses Pod Security Admission with:
+The `thumbnail-pipeline` namespace uses Pod Security Admission labels
+with:
 
-* `baseline` enforcement
-* `restricted` audit
-* `restricted` warning
+```text
+enforce: baseline
+audit:   restricted
+warn:    restricted
+```
 
-The application does not require Kubernetes API access, so no custom Roles, RoleBindings, ClusterRoles, or ClusterRoleBindings are configured for it.
+The application does not require access to the Kubernetes API.
+
+Consequently, no custom `Role`, `RoleBinding`, `ClusterRole`, or
+`ClusterRoleBinding` was introduced for the application.
+
+This is an intentional least-privilege decision rather than an omitted
+permission requirement.
 
 ### Network Security
 
-A Kubernetes `NetworkPolicy` restricts application egress to the required services:
+A Kubernetes `NetworkPolicy` restricts application egress to the
+dependencies required by the application:
 
-* MinIO on TCP `9000`
-* Jaeger on TCP `4317`
-* Kubernetes DNS on TCP/UDP `53`
+| Destination    | Protocol | Port | Purpose                               |
+| -------------- | -------- | ---: | ------------------------------------- |
+| MinIO          | TCP      | 9000 | Object storage                        |
+| Jaeger         | TCP      | 4317 | OTLP trace export                     |
+| Kubernetes DNS | UDP/TCP  |   53 | Service discovery and name resolution |
 
-Other tested application egress ports were blocked by the policy.
+The policy limits application egress to these required destinations.
+
+NetworkPolicy behavior was verified during the security phase.
 
 ### Secrets
 
-Application and MinIO credentials are supplied through Kubernetes Secrets.
+Application and MinIO credentials are supplied through Kubernetes
+Secrets.
 
-Helm templates support configurable secret values, while local development secret manifests are kept outside version control.
+Sensitive local Secret manifests are excluded from version control.
 
-Production deployments should use an appropriate external secret-management solution and Kubernetes/etcd encryption controls.
+The Helm chart supports optional Secret creation so that credentials
+can be supplied separately from the Git-managed deployment
+configuration.
+
+Production deployments should use an appropriate external secret
+management solution and suitable Kubernetes/etcd encryption controls.
+
+These production controls are outside the scope of this local
+implementation.
 
 ### Image Security
 
-The application image is scanned with Trivy.
+The application image was scanned using Trivy.
 
-The current application image has:
+At the verified scan point:
 
-* `0` CRITICAL vulnerabilities
-* No remaining Python package vulnerabilities identified by the scan
-* Remaining HIGH findings are associated with the underlying Debian packages and are tracked separately
+* `0` CRITICAL OS vulnerabilities were reported.
+* Python-package findings identified in an earlier scan were resolved by
+  updating the affected dependency.
+* `44` HIGH OS-package findings remained in the Debian-based image.
+* The project therefore does **not** claim that the image is
+  vulnerability-free.
 
-The project does not claim that the base image is vulnerability-free.
+The remaining OS-package findings were associated with the underlying
+base image packages rather than the application's Python dependencies.
+
+Trivy scanning was used as a security assessment step; it is not
+currently part of the GitHub Actions CI workflow.
 
 ### Resource Controls
 
@@ -64,30 +102,47 @@ The application container defines resource requests and limits:
 | CPU      |  `100m` |  `500m` |
 | Memory   | `128Mi` | `256Mi` |
 
-This provides basic resource isolation and helps prevent uncontrolled resource consumption.
+These settings provide basic resource boundaries and help Kubernetes
+schedule and constrain the application workload.
 
 ## Verification
 
-Security controls were verified against the running Kubernetes workload, including:
+Security controls were verified against the running Kubernetes
+workload, including:
 
 * non-root execution
-* security context configuration
-* service-account token absence
+* container security context
+* ServiceAccount token absence
 * Pod Security namespace labels
-* RBAC configuration
-* NetworkPolicy enforcement
+* absence of unnecessary application RBAC permissions
+* NetworkPolicy configuration and behavior
 * resource requests and limits
 * Trivy image scanning
-* application health and readiness endpoints
+* application health and readiness
 
-The application was verified running successfully after the security changes.
+The application remained operational after the security hardening
+changes.
 
 ## Known Hardening Consideration
 
-The current MinIO deployment has not been forced to run as a non-root user because its existing image and persistent-volume behavior have not been validated for that change.
+The current MinIO deployment has not been forced to run as a non-root
+user.
 
-It remains a future hardening consideration rather than an unverified configuration change.
+The existing MinIO image and persistent-volume behavior were not
+validated sufficiently to make that change safely within this project.
 
-## Scope
+MinIO non-root hardening therefore remains a future improvement rather
+than an unverified security claim.
 
-These controls demonstrate practical container and Kubernetes security for this learning project. They are not intended to represent a complete production security program.
+## Security Scope
+
+These controls demonstrate practical container and Kubernetes security
+for a local cloud-native project.
+
+They do not represent a complete production security program.
+
+Production deployments would require additional controls such as
+centralized secret management, stronger supply-chain controls, image
+signing and verification, vulnerability remediation processes,
+Kubernetes/etcd encryption, centralized security monitoring, and
+environment-specific security policies.

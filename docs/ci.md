@@ -4,122 +4,145 @@
 
 The project uses GitHub Actions for continuous integration.
 
-The CI workflow validates application changes through automated tests, Docker image builds, and container health validation.
+The CI workflow validates application changes through automated tests,
+Docker image builds, and container runtime health validation.
 
 ## Workflow Triggers
 
 The workflow runs for:
 
-- Pull requests targeting `main`
-- Pushes to `main`
+* Pull requests targeting `main`
+* Pushes to `main`
 
 ## CI Workflow
 
-```text
-GitHub event
-     │
-     ├── Pull Request → main
-     │
-     └── Push → main
-             │
-             ▼
+```text id="q6j2wn"
+GitHub Event
+     |
+     +-- Pull Request → main
+     |
+     +-- Push → main
+             |
+             v
       GitHub Actions
-             │
-             ├── Checkout repository
-             ├── Set up Python 3.10
-             ├── Install dependencies
-             ├── Run automated tests
-             ├── Build Docker image
-             ├── Tag image using Git SHA
-             └── Validate container health
+             |
+             +-- Checkout repository
+             |
+             +-- Set up Python 3.10
+             |
+             +-- Install dependencies
+             |
+             +-- Run automated tests
+             |
+             +-- Build Docker image
+             |
+             +-- Tag image using Git SHA
+             |
+             +-- Validate container health
 ```
 
-### Automated Tests
+## Automated Tests
 
 The workflow installs dependencies from:
 
-> app/requirements.txt
+```text id="9i6h2k"
+app/requirements.txt
+```
 
-and runs:
+and executes the application test suite with:
 
-> python -m pytest -q app/tests
+```bash id="c4w7lm"
+python -m pytest -q app/tests
+```
 
-The application test suite currently contains 19 tests.
+A test failure causes the CI workflow to fail.
 
-### Docker Build
+## Docker Build
 
 The CI workflow builds the application image from:
 
-> app/Dockerfile
+```text id="u2q0ef"
+app/Dockerfile
+```
 
-The image is tagged using the first seven characters of GITHUB_SHA:
+The image is tagged using the first seven characters of `GITHUB_SHA`:
 
-> thumbnail-service:<git-sha>
+```text id="y6b4ra"
+thumbnail-service:<git-sha>
+```
 
-This provides a traceable image tag for each CI execution.
+This provides a traceable relationship between a CI-built image and the
+Git commit that produced it.
 
-### Docker Validation
+## Docker Runtime Validation
 
 After the image is built, CI:
 
-1. Inspects the image. 
-2. Starts a test container. 
-3. Waits for application startup. 
-4. Checks the Docker health status. 
-5. Requires the health status to be `healthy`. 
+1. Inspects the image.
+2. Starts a test container.
+3. Waits for application startup.
+4. Checks the Docker health status.
+5. Requires the health status to be `healthy`.
 6. Stops and removes the test container.
 
 A failed health assertion causes the CI job to fail.
 
-### Pull Request Validation
+This verifies not only that the image can be built, but also that the
+resulting container can start successfully and report healthy runtime
+status.
 
-Pull requests targeting main are validated before merging.
+## Pull Request Validation
 
-This was verified using Pull Request #1.
+Pull requests targeting `main` execute the CI workflow before merging.
 
-The pull request successfully executed:
+This provides automated validation of application tests, image
+construction, and container health.
 
-> CI / ci (pull_request)
-
-and passed.
-
-### Push Validation
+## Push Validation
 
 Pushes to `main` also trigger the CI workflow.
 
-This was verified using commits pushed directly to main.
+This provides continuous validation of the repository's main branch
+after changes are committed.
 
-The resulting:
+## Failure Handling
 
-> CI / ci (push)
+CI failure handling was deliberately tested by changing the expected
+Docker health status from:
 
-workflow completed successfully.
+```text id="1m2qkv"
+healthy
+```
 
-### Failure Handling
+to an intentionally incorrect value:
 
-CI failure handling was deliberately tested by changing the expected Docker health status from:
+```text id="wqg2z9"
+broken
+```
 
-> healthy
+The workflow correctly failed with a non-zero exit status.
 
-to:
+The validation was then restored to the expected `healthy` state and the
+workflow passed again.
 
-> broken
+This demonstrated that the CI pipeline can detect a failed runtime
+validation rather than only reporting successful builds.
 
-The workflow correctly failed with exit code 1.
-
-The validation was then restored to `healthy`, and CI passed again.
-
-### Current Scope
+## Current Scope
 
 The CI pipeline currently provides:
 
-1. Python environment setup 
-2. Dependency installation 
-3. Automated application tests 
-4. Docker image building 
-5. Git **SHA** image tagging 
-6. Docker runtime health validation 
-7. Pull request validation 
-8. Push-to-main validation
+* Python environment setup
+* Dependency installation
+* Automated application tests
+* Docker image building
+* Git SHA-based image tagging
+* Docker runtime health validation
+* Pull request validation
+* Push-to-main validation
 
-**Container registry publishing and GitOps deployment are not part of the current CI workflow.**
+Container registry publishing is **not** part of the current CI
+workflow.
+
+GitOps deployment is also separate from CI. Argo CD is responsible for
+reconciling the desired Kubernetes state from Git.

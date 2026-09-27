@@ -2,114 +2,185 @@
 
 ## Overview
 
-The project uses **Argo CD** to implement GitOps-based deployment for the Cloud-Native Thumbnail Pipeline.
+The project uses Argo CD to implement GitOps-based deployment for the
+Cloud-Native Thumbnail Pipeline.
 
-Git acts as the declarative source of truth, while Argo CD continuously compares the desired state with the live Kubernetes state and reconciles differences.
+The Git repository contains the declarative deployment configuration.
+Argo CD compares the desired state defined in Git with the live
+Kubernetes state and reconciles differences.
 
-```text
-GitHub
-   |
-   v
-Argo CD
-   |
-   | Helm
-   v
+```text id="7q5c8m"
+Git Repository
+      |
+      v
+   Argo CD
+      |
+      | Helm
+      v
 Kubernetes / Minikube
-   |
-   +-- Thumbnail Service
-   +-- MinIO
-   +-- ConfigMap
-   +-- PVC
-   +-- Services
+      |
+      +-- Thumbnail Service
+      +-- MinIO
+      +-- ConfigMap
+      +-- PVC
+      +-- Services
 ```
 
 ## Implementation
 
 The Argo CD Application is defined in:
 
-```text
+```text id="5x8z2a"
 argocd/application.yaml
 ```
 
-It deploys the Helm chart from:
+The Application points Argo CD to the Helm chart:
 
-```text
+```text id="4w3m6s"
 helm/thumbnail-pipeline/
 ```
 
-Configuration:
+The configured deployment target is:
 
-```text
+```text id="0j4y1k"
 Repository: main branch
-Chart:      helm/thumbnail-pipeline
-Namespace:  thumbnail-pipeline
+Chart:     helm/thumbnail-pipeline
+Namespace: thumbnail-pipeline
 ```
 
-The workflow is:
+The GitOps workflow is:
 
-```text
-Git commit
-    ↓
-GitHub
-    ↓
+```text id="v5m7dr"
+Git Commit
+    |
+    v
+Git Repository
+    |
+    v
 Argo CD
-    ↓
-Helm rendering
-    ↓
-Kubernetes reconciliation
+    |
+    v
+Helm Rendering
+    |
+    v
+Kubernetes Resources
+    |
+    v
+Live Cluster State
 ```
 
-## GitOps Features Verified
+Argo CD is responsible for synchronization and reconciliation, while
+Helm provides the Kubernetes packaging and configuration model.
 
-### Synchronization
+## Synchronization
 
-Argo CD successfully synchronized the Helm-based application to Minikube.
+Argo CD successfully synchronized the Helm-based application to the
+Minikube Kubernetes cluster.
 
-### Drift Detection
+The Argo CD Application reported the expected synchronized and healthy
+state after deployment.
 
-A Kubernetes ConfigMap was intentionally modified outside Git.
+## Drift Detection
 
-Argo CD detected the difference and reported the application as `OutOfSync`.
+GitOps drift detection was deliberately tested by modifying a
+Kubernetes ConfigMap outside the Git-managed configuration.
 
-### Self-Healing
+Argo CD detected the difference between the desired Git state and the
+live Kubernetes state and reported the Application as `OutOfSync`.
+
+Conceptually:
+
+```text id="d4z8qa"
+Desired State
+     |
+     | Git
+     v
+   Argo CD
+     |
+     | comparison
+     v
+Live Kubernetes State
+     |
+     +-- Difference detected
+             |
+             v
+         OutOfSync
+```
+
+## Self-Healing
 
 Automated self-healing was enabled and tested.
 
-After intentional Kubernetes drift, Argo CD automatically restored the resource to the desired Git-defined state.
+After intentional Kubernetes drift, Argo CD automatically reconciled the
+affected resource back to the desired Git-defined state.
 
-```text
-Live state differs
-       ↓
-Argo CD detects drift
-       ↓
-Automatic reconciliation
-       ↓
-Desired state restored
+```text id="e9x3pt"
+Live State Differs
+       |
+       v
+Argo CD Detects Drift
+       |
+       v
+Automatic Reconciliation
+       |
+       v
+Desired State Restored
 ```
 
-### Secret Handling
+This demonstrates the core GitOps reconciliation model used by the
+project.
 
-Secrets are excluded from the normal GitOps render.
+## Secret Handling
 
-The Helm chart supports optional Secret creation for local testing, while credentials are kept outside the committed Git configuration.
+Sensitive credentials are not stored as plaintext Git configuration.
+
+The Helm chart supports optional Secret creation for local deployment,
+while the GitOps configuration can leave Secret creation disabled and
+allow credentials to be supplied separately.
+
+This keeps sensitive runtime values separate from the declarative
+application configuration stored in Git.
+
+## Failure Recovery and Drift
+
+GitOps reconciliation was also exercised during the project's failure
+engineering work.
+
+A Kubernetes NetworkPolicy was intentionally deleted from the live
+cluster. Argo CD reconciled the resource back into the cluster, restoring
+the Git-defined desired state.
+
+This demonstrated that GitOps reconciliation can recover configuration
+drift even when the resource is removed outside the Git workflow.
 
 ## Verification
 
-Phase 8 was verified through:
+The GitOps implementation was verified through:
 
 * Argo CD installation and readiness
+* Argo CD Application configuration
+* Helm and Argo CD integration
 * Application synchronization
-* Helm + Argo CD integration
-* Drift detection
-* Automated self-healing
+* drift detection
+* automated self-healing
 * Kubernetes workload health
-* Clean Git working tree
+* configuration reconciliation after intentional resource deletion
 
-Final state:
+The verified final Application state was:
 
-```text
+```text id="2y7n4w"
 Application: Synced
 Health:      Healthy
 Self-healing: Enabled
 ```
 
+## Scope
+
+The GitOps implementation uses Argo CD locally with Minikube.
+
+It demonstrates declarative Kubernetes deployment, Helm integration,
+drift detection, synchronization, and automated reconciliation.
+
+It does not claim a production-grade multi-cluster GitOps platform,
+external secret-management system, or highly available Argo CD
+deployment.

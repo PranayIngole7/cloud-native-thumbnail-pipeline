@@ -2,34 +2,43 @@
 
 ## 1. Purpose
 
-The Cloud-Native Thumbnail Pipeline is intentionally built around a small application and a deeper operational platform.
+The Cloud-Native Thumbnail Pipeline combines a deliberately small image-processing application with a broader cloud-native and DevOps platform.
 
-The application performs one primary business function:
+The application:
 
-> Accept an image, generate a thumbnail, and store both objects.
+* accepts an image upload
+* validates the image
+* stores the original in MinIO
+* retrieves the original for processing
+* generates a thumbnail using Pillow
+* stores the generated thumbnail in MinIO
+* exposes health and readiness endpoints
 
-The surrounding platform demonstrates modern DevOps and cloud-native engineering practices including:
+The surrounding platform demonstrates:
 
-- containerization
-- Kubernetes orchestration
-- serverless-style serving
-- CI
-- container security scanning
-- GitOps
-- observability
-- failure testing
+* Docker containerization
+* Kubernetes orchestration
+* Helm packaging
+* Knative Serving
+* GitHub Actions CI
+* GitOps with Argo CD
+* OpenTelemetry tracing
+* Prometheus metrics
+* Grafana dashboards
+* Jaeger trace visualization
+* Kubernetes security controls
+* Trivy image scanning
+* failure and recovery testing
 
-The architecture is designed for local development using Minikube rather than paid cloud infrastructure.
+The project is designed for local development and experimentation using Minikube.
 
 ---
 
-## 2. Core Principle
+## 2. Architectural Principle
 
 > **The application stays deliberately small; the infrastructure and operational engineering provide the depth.**
 
-This prevents application complexity from hiding the DevOps concepts being demonstrated.
-
-There is intentionally one primary application service rather than multiple microservices.
+The project intentionally uses one primary application service rather than multiple application microservices. This keeps the business logic understandable while allowing the platform to demonstrate realistic operational concerns.
 
 ---
 
@@ -38,7 +47,7 @@ There is intentionally one primary application service rather than multiple micr
 ```text
                          Developer
                              │
-                             │ git push
+                             │ git push / pull request
                              ▼
                           GitHub
                              │
@@ -46,186 +55,49 @@ There is intentionally one primary application service rather than multiple micr
                     ┌─────────────────┐
                     │ GitHub Actions  │
                     │                 │
-                    │ Test            │
-                    │ Build           │
-                    │ Trivy Scan      │
-                    │ Publish Image    │
-                    └────────┬────────┘
+                    │ Dependencies    │
+                    │ Tests           │
+                    │ Docker Build    │
+                    │ Image Validation│
+                    └─────────────────┘
+
                              │
-                             ▼
-                    Container Registry
-                             │
-                             ▼
-                     GitOps Configuration
-                             │
+                             │ Git repository
                              ▼
                          Argo CD
                              │
+                             │ GitOps reconciliation
                              ▼
-                 ┌───────────────────────┐
-                 │ Minikube / Kubernetes │
-                 │                       │
-                 │   Knative Serving     │
-                 │          │            │
-                 │          ▼            │
-                 │   Thumbnail API       │
-                 │   FastAPI + Pillow    │
-                 │          │            │
-                 │          ▼            │
-                 │        MinIO          │
-                 └───────────────────────┘
+                 ┌─────────────────────────┐
+                 │   Minikube / Kubernetes │
+                 │                         │
+                 │  Helm-managed workload  │
+                 │          │              │
+                 │          ▼              │
+                 │   Thumbnail API         │
+                 │   FastAPI + Pillow      │
+                 │          │              │
+                 │          ▼              │
+                 │        MinIO             │
+                 │          │              │
+                 │       Persistent         │
+                 │        Volume             │
+                 └─────────────────────────┘
+
+      Observability
+            │
+            ├── OpenTelemetry → Jaeger
+            ├── Prometheus
+            └── Grafana
 ```
 
-Observability operates alongside the application:
-
-```text
-Thumbnail API
-     │
-     ├──────── OpenTelemetry
-     │
-     └──────── Metrics
-                   │
-                   ▼
-               Prometheus
-                   │
-                   ▼
-                Grafana
-```
+Knative Serving is also installed and configured in the Kubernetes environment to demonstrate revision-based and request-driven serving concepts.
 
 ---
 
-## 4. Architectural Layers
+## 4. Application Architecture
 
-The system is divided into five logical areas.
-
-### 4.1 Application
-
-Responsible for:
-
-- HTTP API
-- request validation
-- image processing
-- object storage interaction
-- application health
-- application telemetry
-
-Technology:
-
-- Python
-- FastAPI
-- Pillow
-- MinIO client
-- pytest
-
----
-
-### 4.2 Platform
-
-Responsible for running the application.
-
-Technology:
-
-- Docker
-- Kubernetes
-- Minikube
-- kubectl
-- Helm
-- Knative Serving
-
-Responsibilities include:
-
-- workload scheduling
-- networking
-- configuration
-- secrets
-- health probes
-- resource management
-- restart/recovery
-- security contexts
-- scaling
-
----
-
-### 4.3 Delivery
-
-Responsible for getting verified application artifacts into the runtime environment.
-
-Technology:
-
-- Git
-- GitHub
-- GitHub Actions
-- Container Registry
-- Argo CD
-
-The delivery model separates:
-
-```text
-CI
-=
-Build and verify artifacts
-
-GitOps
-=
-Declare desired deployment state
-
-Argo CD
-=
-Reconcile desired state with Kubernetes
-```
-
----
-
-### 4.4 Observability
-
-Responsible for understanding runtime behavior.
-
-Technology:
-
-- OpenTelemetry
-- Prometheus
-- Grafana
-
-The observability layer should expose enough information to investigate:
-
-- request volume
-- request failures
-- latency
-- storage failures
-- processing failures
-- application restarts
-- scaling behavior
-
----
-
-### 4.5 Security
-
-Security is implemented at multiple layers.
-
-Application/container:
-
-- minimal runtime image
-- non-root execution where practical
-- no hard-coded secrets
-
-Kubernetes:
-
-- security contexts
-- dropped capabilities where appropriate
-- read-only filesystem where practical
-- resource limits
-- secret/config separation
-
-Supply chain:
-
-- Trivy image scanning
-- CI integration
-
----
-
-## 5. Application Architecture
-
-The application is intentionally a single FastAPI service.
+The application is a single FastAPI service.
 
 ```text
 Client
@@ -233,670 +105,548 @@ Client
   ▼
 FastAPI
   │
-  ├── Validation
+  ├── Validate image
   │
-  ├── Image ID generation
+  ├── Generate image ID
   │
-  ├── MinIO original upload
+  ├── Store original ──────► MinIO
   │
-  ├── Pillow processing
+  ├── Retrieve original ◄── MinIO
   │
-  ├── MinIO thumbnail upload
+  ├── Generate thumbnail
+  │        │
+  │        └── Pillow
   │
-  └── Response
+  └── Store thumbnail ─────► MinIO
 ```
 
-The application does not contain separate services for:
+The application contains the following primary responsibilities:
 
-- upload
-- image processing
-- storage
-- metadata
+* HTTP request handling
+* image validation
+* image ID generation
+* image processing
+* MinIO object storage operations
+* health/readiness endpoints
+* logging
+* metrics
+* OpenTelemetry tracing
+* controlled error handling
 
-Those responsibilities remain within one small service.
-
-This keeps the application understandable while allowing the platform architecture to demonstrate distributed-system concepts.
+There are no separate application services for upload, processing, storage, or metadata.
 
 ---
 
-## 6. API Design
+## 5. API
 
-The initial API contains:
+The primary application endpoints are:
 
-### `POST /thumbnails`
+| Endpoint               | Purpose                                   |
+| ---------------------- | ----------------------------------------- |
+| `POST /thumbnails`     | Upload an image and generate a thumbnail  |
+| `GET /thumbnails/{id}` | Retrieve a generated thumbnail            |
+| `GET /health`          | Process health check                      |
+| `GET /ready`           | Application readiness check               |
+| `GET /metrics/`        | Prometheus-compatible application metrics |
 
-Accepts an image upload.
-
-Conceptual flow:
+The thumbnail processing flow is:
 
 ```text
 Receive upload
-    ↓
-Validate content
-    ↓
-Generate image ID
-    ↓
-Store original
-    ↓
-Open image with Pillow
-    ↓
-Generate thumbnail
-    ↓
-Store thumbnail
-    ↓
-Return metadata
-```
-
----
-
-### `GET /thumbnails/{id}`
-
-Retrieves the generated thumbnail associated with the image ID.
-
----
-
-### `GET /health`
-
-Provides basic process health.
-
-This endpoint answers:
-
-> Is the application process running?
-
----
-
-### `GET /ready`
-
-Provides readiness information.
-
-This endpoint answers:
-
-> Is the application ready to serve requests?
-
-The exact readiness dependencies will be finalized during implementation.
-
----
-
-## 7. Image Processing
-
-Initial supported formats:
-
-- JPEG
-- PNG
-- WEBP
-
-The application validates the actual image content rather than relying only on the filename extension.
-
-Thumbnail generation uses a fixed maximum dimension while preserving aspect ratio.
-
-Examples:
-
-```text
-1920 × 1080
-      ↓
-320 × 180
-
-1000 × 1500
-      ↓
-approximately 213 × 320
-```
-
-The exact maximum dimensions and image encoding settings will be finalized during implementation.
-
----
-
-## 8. Object Storage
-
-MinIO provides persistent object storage.
-
-Logical layout:
-
-```text
-thumbnail-pipeline/
-├── originals/
-│   └── <image-id>.<extension>
-│
-└── thumbnails/
-    └── <image-id>.<extension>
-```
-
-The same logical image ID identifies the original and generated thumbnail.
-
-The application does not depend on local container filesystem persistence.
-
----
-
-## 9. Storage Consistency
-
-MinIO operations are separate storage operations and are not automatically equivalent to a database transaction.
-
-For example:
-
-```text
-Store original
       │
       ▼
-Generate thumbnail
+Validate image
       │
-      X
-   FAILURE
+      ▼
+Generate image ID
+      │
+      ▼
+Store original in MinIO
+      │
+      ▼
+Retrieve original
+      │
+      ▼
+Process with Pillow
+      │
+      ▼
+Store thumbnail in MinIO
+      │
+      ▼
+Return response
 ```
 
-At this point the original may exist while the thumbnail does not.
+---
 
-This creates an intentional failure scenario.
+## 6. Object Storage
 
-The implementation must define how this partial state is handled.
+MinIO provides S3-compatible object storage for the application.
 
-Possible strategies include:
+The application stores original and generated thumbnail objects separately.
 
-1. delete the original when thumbnail generation fails
-2. retain the original and record failure state
-3. introduce metadata describing processing state
+```text
+MinIO
+└── thumbnail-pipeline/
+    ├── originals/
+    │   └── <image-id>.<extension>
+    │
+    └── thumbnails/
+        └── <image-id>.<extension>
+```
 
-The initial implementation should choose the simplest approach that provides predictable behavior.
+MinIO data is backed by a Kubernetes PersistentVolumeClaim.
 
-This decision will be documented after implementation and testing.
+The application does not use its container filesystem as the persistent storage layer for uploaded images.
 
 ---
 
-## 10. Docker Architecture
+## 7. Kubernetes Architecture
 
-The application is packaged as a Docker image.
-
-The image contains:
-
-- Python runtime
-- application dependencies
-- FastAPI application
-- Pillow
-- required configuration
-
-The image should be:
-
-- reproducible
-- reasonably small
-- configured through environment variables
-- free of hard-coded secrets
-- non-root where practical
-
-The container should not depend on files written to the local filesystem for persistent image storage.
-
----
-
-## 11. Kubernetes Architecture
-
-Minikube provides the local Kubernetes cluster.
+Minikube provides the local Kubernetes environment.
 
 Kubernetes is responsible for:
 
-- workload execution
-- networking
-- configuration
-- secrets
-- resource limits
-- health probes
-- restart behavior
-- security contexts
+* workload scheduling
+* service discovery
+* networking
+* configuration
+* secrets
+* health probes
+* resource requests and limits
+* container restart behavior
+* security contexts
+* persistent storage
 
-The project intentionally uses Kubernetes concepts that are useful for production environments without attempting to reproduce an entire production platform locally.
+The application is deployed as a Kubernetes Deployment and exposed through a ClusterIP Service.
 
----
+The MinIO deployment uses:
 
-## 12. Helm
+* Deployment
+* Service
+* Secret
+* PersistentVolumeClaim
+* initialization Job
 
-Helm packages the application deployment configuration.
-
-The Helm chart is responsible for application-level deployment configuration such as:
-
-- image
-- replicas or serving configuration
-- resources
-- environment variables
-- secrets/configuration references
-- service configuration
-- health probes
-- security settings
-
-Infrastructure dependencies remain conceptually separate from the application chart where practical.
+The application and MinIO are isolated within the `thumbnail-pipeline` namespace.
 
 ---
 
-## 13. Knative Serving
+## 8. Helm Architecture
 
-Knative Serving provides the serverless-style HTTP serving layer.
+Helm provides reusable and parameterized deployment packaging.
 
-Its purpose in this project is to demonstrate:
+The project Helm chart manages the application platform configuration, including:
 
-- request-driven serving
-- revision-based deployment concepts
-- dynamic scaling
-- serverless-style application lifecycle
-- potentially scale-to-zero behavior
+* application image
+* replica count
+* service
+* resources
+* configuration
+* secrets
+* health probes
+* MinIO deployment
+* MinIO service
+* MinIO persistent storage
+* MinIO initialization
 
-Local Minikube behavior must be validated experimentally.
+Configuration is maintained through `values.yaml`.
 
-The project will not assume that every Knative production feature behaves identically in the local environment.
+Local secret values are kept outside version-controlled configuration.
 
-Knative is therefore used because it demonstrates a meaningful platform concept, not simply because it is another technology to install.
-
----
-
-## 14. CI Architecture
-
-GitHub Actions performs continuous integration.
-
-The initial pipeline is conceptually:
+Helm supports the deployment lifecycle:
 
 ```text
-git push
-   │
-   ▼
+Install
+   ↓
+Upgrade
+   ↓
+Verify
+   ↓
+Rollback
+```
+
+---
+
+## 9. Knative Serving
+
+Knative Serving is included to demonstrate serverless-style Kubernetes serving concepts.
+
+The project uses Knative to explore:
+
+* revisions
+* request-driven serving
+* traffic management
+* autoscaling
+* scale-to-zero behavior
+* cold-start behavior
+* revision recovery
+
+Knative is an additional platform capability rather than a requirement for the core thumbnail-processing application.
+
+This allows the project to demonstrate both conventional Kubernetes deployment and serverless-style serving concepts without making the application itself dependent on Knative-specific business logic.
+
+---
+
+## 10. CI Architecture
+
+GitHub Actions provides continuous integration.
+
+The current CI workflow performs:
+
+```text
+Git push / Pull Request
+        │
+        ▼
 GitHub Actions
-   │
-   ├── Install dependencies
-   │
-   ├── Run tests
-   │
-   ├── Build Docker image
-   │
-   ├── Run Trivy scan
-   │
-   └── Publish image
+        │
+        ├── Set up Python 3.10
+        ├── Install dependencies
+        ├── Run pytest
+        ├── Build Docker image
+        ├── Inspect image
+        ├── Run container
+        └── Verify Docker healthcheck
 ```
 
-CI should verify the artifact before it becomes available for deployment.
+The CI workflow verifies that application changes can be tested, containerized, and started successfully.
 
-The exact image tagging strategy will be finalized during implementation.
+Container vulnerability scanning with Trivy was performed as part of the project's security work and is documented separately.
+
+The current CI workflow does not publish images to an external container registry.
 
 ---
 
-## 15. GitOps Architecture
+## 11. GitOps and Argo CD
 
-Deployment configuration is maintained as desired state.
+Argo CD provides GitOps-based Kubernetes deployment management.
 
-The intended flow is:
+The desired deployment configuration is stored in Git and reconciled against the Kubernetes cluster.
 
 ```text
-Application Change
-       │
-       ▼
-GitHub Actions
-       │
-       ▼
-Container Registry
-       │
-       ▼
-GitOps Configuration
-       │
-       ▼
-Argo CD
-       │
-       ▼
-Kubernetes
+Git Repository
+      │
+      ▼
+   Argo CD
+      │
+      ├── Compare desired state
+      │
+      ├── Detect drift
+      │
+      └── Reconcile
+             │
+             ▼
+        Kubernetes
 ```
 
-Argo CD continuously compares the desired state with the cluster state.
+The project demonstrates:
 
-This allows the project to demonstrate:
+* declarative deployment
+* Git-based desired state
+* synchronization
+* drift detection
+* reconciliation
+* self-healing
+* deployment recovery
 
-- declarative deployment
-- reconciliation
-- drift detection
-- Git as the deployment source of truth
+GitHub Actions performs CI validation; Argo CD performs GitOps reconciliation.
 
-GitHub Actions should not become the primary mechanism for directly applying Kubernetes resources.
+These responsibilities remain separate.
 
 ---
 
-## 16. Observability Architecture
+## 12. Observability Architecture
 
-Observability will be introduced incrementally.
-
-Conceptually:
+The project provides application and platform observability through metrics, logs, and distributed tracing.
 
 ```text
-                  Thumbnail API
-                       │
-          ┌────────────┴────────────┐
-          │                         │
-          ▼                         ▼
-   OpenTelemetry                Metrics
-          │                         │
-          │                         ▼
-          │                    Prometheus
-          │                         │
-          └────────────┬────────────┘
-                       ▼
-                    Grafana
+                    Thumbnail API
+                         │
+          ┌──────────────┼──────────────┐
+          │              │              │
+          ▼              ▼              ▼
+        Logs        OpenTelemetry     Metrics
+          │              │              │
+          │              ▼              ▼
+          │           Jaeger        Prometheus
+          │                             │
+          │                             ▼
+          └──────────────────────────► Grafana
 ```
 
-The goal is to correlate application behavior with infrastructure behavior.
+### Metrics
 
-Example investigation:
+Prometheus collects application metrics for operational visibility.
 
-```text
-Request latency increased
-        ↓
-Check application metrics
-        ↓
-Check thumbnail processing time
-        ↓
-Check MinIO interaction
-        ↓
-Check container/resource behavior
-        ↓
-Check Kubernetes/Knative behavior
-```
+### Dashboards
 
-This turns observability into an operational debugging tool rather than simply a dashboard exercise.
+Grafana provides visualization of collected metrics.
+
+### Tracing
+
+OpenTelemetry instruments application operations and exports traces to Jaeger.
+
+Custom application spans include important processing and storage operations.
+
+### Logs
+
+Application logs provide request and runtime information useful during troubleshooting.
+
+Observability is also used during failure testing to correlate application behavior with Kubernetes events and workload state.
 
 ---
 
-## 17. Security Architecture
+## 13. Security Architecture
 
-Security controls are layered.
+Security controls are applied at the container and Kubernetes layers.
 
-### Container
+### Container security
 
-- run as non-root
-- minimize unnecessary packages
-- avoid hard-coded credentials
-- scan images with Trivy
+The application container:
 
-### Kubernetes
+* runs as a non-root user
+* drops unnecessary Linux capabilities
+* prevents privilege escalation
+* uses the Kubernetes runtime default seccomp profile
+* avoids hard-coded credentials
 
-- security contexts
-- resource limits
-- read-only filesystem where practical
-- dropped capabilities where appropriate
-- explicit configuration and secret handling
+### Kubernetes security
 
-### CI
+The deployment uses:
 
-```text
-Source
-  ↓
-Test
-  ↓
-Build
-  ↓
-Trivy Scan
-  ↓
-Publish only according to project policy
-```
+* security contexts
+* resource requests and limits
+* Kubernetes Secrets
+* NetworkPolicy controls
+* namespace-level Pod Security labels
+* disabled automatic service-account token mounting where applicable
 
-The initial project does not implement a custom authentication system.
+The application does not require access to the Kubernetes API, so no custom application RBAC permissions are required.
+
+### Image security
+
+Trivy is used to scan container images for known vulnerabilities.
+
+The project records the scan results and remediation performed rather than claiming that the final image is vulnerability-free.
 
 ---
 
-## 18. Failure Architecture
+## 14. Failure and Recovery Architecture
 
-Failure testing is treated as a first-class engineering concern.
+Failure testing is part of the project's operational verification.
 
-Important scenarios include:
+Tested scenarios include:
 
-### Invalid input
+* application/container termination
+* Pod deletion and replacement
+* MinIO Pod failure
+* missing configuration Secret
+* GitOps drift
+* readiness probe failure
+* liveness configuration failure
+* controlled memory-pressure testing
+* Kubernetes scheduling failure
+* persistent-volume verification
+* final recovery verification
 
-```text
-Client
-  ↓
-Invalid image
-  ↓
-Validation failure
-  ↓
-Controlled API response
-```
+The tests demonstrated Kubernetes restart/replacement behavior, GitOps reconciliation, storage mounting, scheduling behavior, and troubleshooting workflows.
 
-### MinIO failure
+Not every failure experiment reproduced the exact intended failure condition. For example, a clean liveness-triggered restart and `OOMKilled` condition were not successfully reproduced during the controlled tests. These limitations are documented in the failure-engineering documentation.
+
+---
+
+## 15. Security and Delivery Boundaries
+
+The project separates three major concerns:
 
 ```text
 Application
-    ↓
-MinIO
-    X
- unavailable
-    ↓
-Application handles storage error
-```
+    │
+    ├── FastAPI
+    ├── Pillow
+    └── MinIO client
 
-### Processing failure
+Platform
+    │
+    ├── Kubernetes
+    ├── Minikube
+    ├── Helm
+    └── Knative
 
-```text
-Original stored
-      ↓
-Pillow processing
-      X
-    failure
-```
-
-This scenario is particularly important because it can produce partial state.
-
-### Application crash
-
-```text
-Running container
-      ↓
-Application crash
-      ↓
-Kubernetes/Knative detects failure
-      ↓
-Workload recovery
-```
-
-### GitOps drift
-
-```text
-Desired state ≠ Cluster state
-          ↓
-       Argo CD
-          ↓
-     Reconciliation
-```
-
-These scenarios demonstrate operational behavior rather than only happy-path functionality.
-
----
-
-## 19. Repository Boundaries
-
-```text
-app/
-    Application implementation
-
-helm/
-    Application deployment packaging
-
-k8s/
-    Kubernetes infrastructure configuration
-
-gitops/
-    Desired deployment state
-
-.github/
-    CI automation
-
-docs/
-    Technical documentation
-```
-
-The primary boundary is:
-
-```text
-Application
-    ≠
-Infrastructure
-    ≠
 Delivery
+    │
+    ├── GitHub
+    ├── GitHub Actions
+    └── Argo CD
 ```
 
-Keeping these boundaries clear makes the project easier to reason about and allows individual platform technologies to be introduced incrementally.
+This separation keeps application functionality independent from deployment and delivery mechanisms.
 
 ---
 
-## 20. Environment Strategy
+## 16. Repository Structure
 
-The initial environment is local development.
+```text
+cloud-native-thumbnail-pipeline/
+│
+├── app/
+│   ├── src/
+│   ├── tests/
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+├── helm/
+│   └── thumbnail-pipeline/
+│
+├── k8s/
+│   ├── application/
+│   ├── minio/
+│   ├── knative/
+│   └── observability/
+│
+├── monitoring/
+│   ├── prometheus/
+│   └── grafana/
+│
+├── argocd/
+│   └── application.yaml
+│
+├── .github/
+│   └── workflows/
+│
+├── docs/
+│
+├── docker-compose.yml
+├── README.md
+└── LICENSE
+```
+
+The main architectural boundaries are:
+
+```text
+Application
+    ≠
+Platform configuration
+    ≠
+Delivery automation
+    ≠
+Documentation
+```
+
+---
+
+## 17. Environment Strategy
+
+The project uses a local Kubernetes environment:
 
 ```text
 Developer Machine
        │
        ▼
-Docker Engine
+ Docker Engine
        │
        ▼
-Minikube
+    Minikube
        │
        ▼
-Kubernetes
+  Kubernetes
        │
-       ├── Knative
        ├── Thumbnail API
-       └── MinIO
+       ├── MinIO
+       ├── Knative
+       ├── Argo CD
+       ├── Jaeger
+       ├── Prometheus
+       └── Grafana
 ```
 
-The project does not initially introduce separate:
-
-- development
-- staging
-- production
-
-environments.
-
-The objective is to establish a complete, reproducible local platform first.
+The project intentionally focuses on a reproducible local environment rather than introducing separate development, staging, and production clusters or paid cloud infrastructure.
 
 ---
 
-## 21. Technology Selection Rationale
+## 18. Technology Selection
 
-### Minikube
-
-Selected for beginner-friendly local Kubernetes learning and straightforward Kubernetes experimentation.
-
-### Docker Engine
-
-Selected as the container runtime on the Linux development environment.
-
-### Helm
-
-Provides reusable and parameterized Kubernetes application packaging.
-
-### Knative Serving
-
-Adds a meaningful serverless-style serving and scaling layer.
-
-### GitHub Actions
-
-Provides accessible CI automation integrated with the source repository.
-
-### Argo CD
-
-Demonstrates declarative GitOps and reconciliation.
-
-### MinIO
-
-Provides local S3-compatible object storage without requiring paid cloud infrastructure.
-
-### OpenTelemetry
-
-Provides a standard telemetry model for application instrumentation.
-
-### Prometheus
-
-Provides metrics collection and querying.
-
-### Grafana
-
-Provides operational visualization.
-
-### Trivy
-
-Provides container vulnerability scanning.
+| Technology       | Purpose                             |
+| ---------------- | ----------------------------------- |
+| Python / FastAPI | Thumbnail-processing API            |
+| Pillow           | Image processing                    |
+| MinIO            | S3-compatible object storage        |
+| Docker           | Application containerization        |
+| Kubernetes       | Container orchestration             |
+| Minikube         | Local Kubernetes environment        |
+| Helm             | Kubernetes application packaging    |
+| Knative Serving  | Serverless-style serving concepts   |
+| GitHub Actions   | Continuous integration              |
+| Argo CD          | GitOps continuous delivery          |
+| OpenTelemetry    | Application tracing instrumentation |
+| Jaeger           | Trace collection and visualization  |
+| Prometheus       | Metrics collection                  |
+| Grafana          | Metrics visualization               |
+| Trivy            | Container vulnerability scanning    |
 
 ---
 
-## 22. Explicitly Out of Scope
+## 19. Explicitly Out of Scope
 
-The initial architecture intentionally excludes:
+The project intentionally does not introduce:
 
-- Kafka
-- Redis
-- AI/LLM
-- authentication systems
-- multiple application microservices
-- service mesh
-- custom Kubernetes operators/controllers
-- paid cloud infrastructure
-- multi-region architecture
-- multi-cloud architecture
-- K3s
-- kind
-- Docker Desktop
+* multiple application microservices
+* Kafka
+* Redis
+* service mesh
+* custom Kubernetes operators
+* custom Kubernetes controllers
+* multi-region deployment
+* multi-cloud deployment
+* paid cloud infrastructure
+* authentication/authorization for the application API
+* AI/LLM processing
 
-These technologies may be useful in other projects, but adding them here would increase complexity without improving the core learning objective.
+These would add complexity without being required for the project's core objective.
 
 ---
 
-## 23. Architecture Evolution
+## 20. Final Architecture
 
-Architecture changes should follow the project's development workflow:
+The resulting architecture can be summarized as:
 
 ```text
-Concept
-   ↓
-Why
-   ↓
-Design
-   ↓
-Implement
-   ↓
-Test
-   ↓
-Debug
-   ↓
-Improve
-   ↓
-Document
-   ↓
-Interview Questions
-   ↓
-Next Phase
+                         GitHub
+                           │
+                           ▼
+                    GitHub Actions
+                    ┌──────┴──────┐
+                    │             │
+                  Tests       Docker Build
+                    │             │
+                    └──────┬──────┘
+                           │
+                           ▼
+                      Git Repository
+                           │
+                           ▼
+                        Argo CD
+                           │
+                           ▼
+                 ┌─────────────────────┐
+                 │ Minikube / Kubernetes│
+                 │                     │
+                 │   Helm-managed      │
+                 │   Thumbnail API     │
+                 │         │           │
+                 │         ▼           │
+                 │       MinIO         │
+                 │         │           │
+                 │        PVC           │
+                 │                     │
+                 │   Knative Serving   │
+                 └─────────────────────┘
+                           │
+          ┌────────────────┼────────────────┐
+          ▼                ▼                ▼
+      Prometheus       OpenTelemetry      Logs
+          │                │
+          ▼                ▼
+       Grafana           Jaeger
 ```
 
-A new technology should be introduced only when there is a clear engineering reason for it.
-
-The project should remain understandable at every stage.
-
----
-
-## 24. Initial Architecture Decision
-
-The initial architecture is therefore:
-
-```text
-FastAPI + Pillow
-        │
-        ▼
-      MinIO
-        │
-        ▼
-Docker Container
-        │
-        ▼
-Kubernetes / Minikube
-        │
-        ▼
-Knative Serving
-        │
-        ├──────── Observability
-        │          ├── OpenTelemetry
-        │          ├── Prometheus
-        │          └── Grafana
-        │
-        └──────── Delivery
-                   ├── GitHub Actions
-                   ├── Container Registry
-                   └── Argo CD
-```
-
-This provides a deliberately small application with a broad but coherent DevOps learning surface.
+The architecture keeps the application intentionally small while providing a complete local platform for containerization, Kubernetes deployment, CI, GitOps, observability, security, and failure/recovery engineering.

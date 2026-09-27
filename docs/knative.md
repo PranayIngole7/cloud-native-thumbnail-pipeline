@@ -1,14 +1,18 @@
 # Knative Serving
 
-Knative Serving adds a request-driven serverless layer to the
-Cloud-Native Thumbnail Pipeline.
+Knative Serving adds a request-driven serving and autoscaling capability
+to the Cloud-Native Thumbnail Pipeline.
 
-It runs on Kubernetes and provides traffic management, revisions,
-autoscaling, and scale-to-zero behavior for the thumbnail service.
+It runs on top of Kubernetes and provides concepts such as revisions,
+traffic management, autoscaling, and scale-to-zero.
+
+Knative is an additional platform capability in this project. The core
+thumbnail service can also run through the standard Kubernetes
+Deployment and Service model.
 
 ## Architecture
 
-``` text
+```text id="8p4c3s"
 Client
   |
   v
@@ -24,29 +28,34 @@ Thumbnail Service Container
 MinIO
 ```
 
-The Knative Service manages the deployed application revision rather
-than requiring the application to be exposed only through a traditional
-Kubernetes Deployment/Service workflow.
+A Knative Service manages the desired configuration for a Knative
+workload and creates revisions from changes to the service template.
 
 ## Implementation
 
-Knative Serving was installed into the local Minikube-based Kubernetes
+Knative Serving was installed in the local Minikube-based Kubernetes
 environment.
 
-The thumbnail application was deployed as a Knative Service using the
-existing container image.
+The thumbnail application was configured as a Knative Service using the
+existing container image and the required MinIO configuration.
 
-The Knative configuration defines the application container and its
-required runtime configuration, including the MinIO connection settings.
+The Knative configuration is maintained separately under:
+
+```text id="5h2v8a"
+k8s/knative/thumbnail-service.yaml
+```
+
+This keeps the Knative serving model separate from the core Kubernetes
+Deployment resources.
 
 ## Revisions
 
-A Knative Service creates revisions when the service configuration or
-application template changes.
+Knative creates a new revision when the revision-producing service
+configuration changes.
 
 Conceptually:
 
-``` text
+```text id="0s8jra"
 Knative Service
       |
       +-- Revision 1
@@ -56,33 +65,37 @@ Knative Service
       +-- Revision 3
 ```
 
-This provides a versioned deployment model and allows traffic to be
-associated with specific revisions.
+Revisions provide immutable versions of the deployed workload
+configuration and form the basis for revision-aware traffic management.
 
-## Traffic
+## Traffic Management
 
 Knative supports routing traffic between revisions.
 
-This makes progressive rollout patterns possible without changing the
-application itself.
+This enables deployment patterns such as directing traffic to a
+specific revision or gradually changing traffic distribution without
+changing the application code.
 
-The project used the Knative revision and traffic model to verify that
-the service could be updated while retaining revision-level deployment
-information.
+The project used the Knative revision and traffic model to understand
+revision-level deployment and routing behavior in the local environment.
+
+This was a local demonstration rather than a production canary or
+blue-green deployment.
 
 ## Autoscaling and Scale-to-Zero
 
-Knative can scale the service based on incoming requests.
+Knative can adjust the number of running instances according to
+incoming request traffic.
 
-When there is no traffic, the service can scale down to zero running
-application instances.
+A revision can scale down to zero when there is no traffic, depending on
+the configured autoscaling behavior.
 
-When a request arrives, Knative can activate a revision and start
-application instances to serve the request.
+When a request arrives after the workload has scaled to zero, Knative
+can activate the revision and start an application instance.
 
 The demonstrated lifecycle is:
 
-``` text
+```text id="c9a4qd"
 No traffic
    |
    v
@@ -106,39 +119,41 @@ Scale down when idle
 
 Scale-to-zero introduces a cold-start trade-off.
 
-The first request after a scale-to-zero period can take longer because
-an application instance must be started before serving traffic.
+The first request after a period with no running instances can take
+longer because the application instance must be activated before the
+request can be served.
 
-This behavior was observed as part of the Knative phase and is an
+Cold-start behavior was observed during the Knative phase and is an
 expected characteristic of scale-to-zero serving.
 
 ## Why Knative?
 
-Knative provides useful serverless capabilities while retaining
-Kubernetes as the underlying platform:
+Knative provides serverless-style capabilities while retaining
+Kubernetes as the underlying orchestration platform:
 
-- request-driven serving
-- revision management
-- traffic routing
-- autoscaling
-- scale-to-zero
-- Kubernetes-native deployment
+* request-driven serving
+* revision management
+* traffic routing
+* autoscaling
+* scale-to-zero
+* Kubernetes-native integration
 
-This makes it useful for workloads where keeping an application replica
-running continuously is unnecessary.
+These capabilities are useful for workloads where continuously running
+application instances are not required.
 
 ## Relationship to Kubernetes
 
 Knative does not replace Kubernetes.
 
-The relationship is:
+Kubernetes provides the underlying orchestration platform, while Knative
+adds higher-level serving and autoscaling behavior.
 
-``` text
+```text id="7y3b1w"
 Kubernetes
    |
-   +-- networking
    +-- scheduling
    +-- containers
+   +-- networking
    +-- storage
    |
    +-- Knative Serving
@@ -149,10 +164,42 @@ Kubernetes
           +-- scale-to-zero
 ```
 
+## Relationship to the Core Deployment
+
+The project maintains both deployment models for demonstration:
+
+```text id="1n2f7m"
+Standard Kubernetes
+        |
+        +-- Deployment
+        +-- Service
+        |
+        v
+Thumbnail Service
+
+
+Knative Serving
+        |
+        +-- Knative Service
+        +-- Revisions
+        +-- Autoscaling
+        |
+        v
+Thumbnail Service
+```
+
+The standard Kubernetes deployment remains the primary application
+deployment model used by the broader project workflow.
+
+Knative demonstrates an additional serverless-style serving model.
+
 ## Scope
 
 The implementation uses Knative Serving locally with Minikube.
 
-The phase demonstrates the core request-driven serving model and its
-operational behavior. It does not claim production-scale cloud
-infrastructure, managed Knative, or production traffic capacity.
+The phase demonstrates request-driven serving, revisions, traffic
+management, autoscaling, scale-to-zero, and cold-start behavior in a
+local environment.
+
+It does not claim production-scale cloud infrastructure, managed
+Knative, multi-node capacity, or production traffic performance.

@@ -2,9 +2,14 @@
 
 ## Overview
 
-The project runs the thumbnail service and its MinIO object storage backend on Kubernetes.
+The Cloud-Native Thumbnail Pipeline runs the thumbnail service and its
+MinIO object-storage backend on Kubernetes.
 
-The Kubernetes deployment uses a dedicated namespace, configuration and secrets, health probes, resource management, persistent storage, and internal ClusterIP services.
+The deployment uses a dedicated namespace, ConfigMaps, Secrets, health
+probes, resource requests and limits, persistent storage, internal
+ClusterIP services, and Kubernetes security controls.
+
+The project uses Minikube as its local Kubernetes environment.
 
 ## Architecture
 
@@ -12,7 +17,7 @@ The Kubernetes deployment uses a dedicated namespace, configuration and secrets,
 Kubernetes Cluster
 └── Namespace: thumbnail-pipeline
     │
-    ├── thumbnail-service
+    ├── Thumbnail Service
     │   ├── Deployment
     │   ├── ConfigMap
     │   ├── Secret
@@ -26,116 +31,190 @@ Kubernetes Cluster
         └── Initialization Job
 ```
 
-The application connects to MinIO through the Kubernetes service name:
-
-> minio:**9000** 
-
-### Kubernetes Resources
-
-The implementation currently defines:
-
-**Application** 
-- Namespace: `thumbnail-pipeline` 
-- Deployment: `thumbnail-service` 
-- ConfigMap: `thumbnail-service-config` 
-- Secret: application MinIO credentials 
-- Service: `thumbnail-service` 
-- Liveness probe: `/health` 
-- Readiness probe: `/ready` 
-  
-**MinIO** 
-- Deployment 
-- Secret 
-- PersistentVolumeClaim 
-- Service 
-- Initialization Job 
- 
-### Configuration
-
-Non-sensitive configuration is stored in the application ConfigMap:
+The application connects to MinIO through the Kubernetes Service:
 
 ```text
-MINIO_ENDPOINT=minio:**9000** 
-MINIO_BUCKET=thumbnail-pipeline 
+minio:9000
+```
+
+## Kubernetes Resources
+
+### Application
+
+The application deployment includes:
+
+* Namespace: `thumbnail-pipeline`
+* Deployment: `thumbnail-service`
+* ConfigMap: `thumbnail-service-config`
+* Secret containing MinIO credentials
+* ClusterIP Service: `thumbnail-service`
+* Liveness probe: `/health`
+* Readiness probe: `/ready`
+* CPU and memory requests and limits
+* Container security context
+
+### MinIO
+
+The MinIO deployment includes:
+
+* Deployment
+* Secret
+* PersistentVolumeClaim
+* ClusterIP Service
+* Initialization Job
+
+The MinIO data volume is provided through the `minio-data` PVC.
+
+## Configuration
+
+Non-sensitive application configuration is provided through the
+ConfigMap:
+
+```text
+MINIO_ENDPOINT=minio:9000
+MINIO_BUCKET=thumbnail-pipeline
 MINIO_SECURE=false
 ```
 
-Sensitive MinIO credentials are provided through Kubernetes Secrets and are not stored as plaintext repository configuration.
+Sensitive MinIO credentials are provided through Kubernetes Secrets.
 
-### Health Probes
+Secret files containing credentials are excluded from the public
+repository and are not committed as plaintext configuration.
+
+## Health Probes
 
 The application exposes:
+
 ```text
-/health 
+/health
 /ready
 ```
 
-Kubernetes uses these endpoints for:
-- Liveness checks 
-- Readiness checks
+Kubernetes uses these endpoints for different purposes:
 
-This allows Kubernetes to distinguish between a running container and an application that is ready to receive traffic.
+* **Liveness probe** — checks whether the application process is
+  functioning.
+* **Readiness probe** — determines whether the Pod should receive
+  traffic.
 
-### Resource Management
+This separates application process health from traffic readiness.
+
+The configured probes use HTTP requests against port `8000`.
+
+## Resource Management
 
 The application container defines:
 
 ```text
 Requests:
-    **CPU**:100m
+    CPU:    100m
     Memory: 128Mi
 
 Limits:
-    **CPU**:    500m
+    CPU:    500m
     Memory: 256Mi
 ```
 
-These values provide basic resource scheduling and protection while remaining suitable for the project's local Minikube environment.
+These values provide basic resource requests for scheduling and memory
+and CPU limits suitable for the project's local Minikube environment.
 
-### Persistent Storage
+## Persistent Storage
 
-MinIO uses a PersistentVolumeClaim with:
+MinIO uses a `PersistentVolumeClaim` with:
 
-> Storage: 2Gi
+```text
+Storage: 2Gi
+Access Mode: ReadWriteOnce
+```
 
-The **PVC** keeps **MinIO** object data outside the container filesystem lifecycle.
+The PVC separates MinIO storage from the lifecycle of an individual
+MinIO Pod.
 
-### Service Discovery
+During failure testing, the MinIO Pod was replaced while the PVC
+remained `Bound` and the replacement Pod mounted the same storage
+volume.
 
-The application communicates with MinIO through Kubernetes internal **DNS**:
+## Service Discovery
 
-> minio:**9000**
+The application communicates with MinIO through Kubernetes internal DNS:
 
-The services use the Kubernetes `ClusterIP` type because the application and MinIO communicate internally within the cluster.
+```text
+minio:9000
+```
 
-### Deployment Verification
+Both application and MinIO Services use the `ClusterIP` type because
+their communication is internal to the Kubernetes cluster.
 
-The Kubernetes deployment was verified by checking:
+The thumbnail service itself can be exposed locally during development
+using Kubernetes port-forwarding.
 
-- Namespace creation 
-- Pod startup 
-- Deployment rollout 
-- Service availability 
-- ConfigMap configuration 
-- Secret references 
-- Health probes 
-- Resource requests and limits 
-- MinIO persistent storage 
-- Application-to-MinIO connectivity
+## Security Controls
 
-The application and MinIO workloads were successfully deployed in the `thumbnail-pipeline` namespace.
+The application deployment includes Kubernetes-level security
+hardening such as:
 
-### Failure and Recovery
+* non-root container execution
+* dropped Linux capabilities
+* disabled privilege escalation
+* `RuntimeDefault` seccomp profile
+* disabled automatic ServiceAccount token mounting
 
-The Kubernetes deployment builds on the application's existing health and storage failure handling.
+NetworkPolicy controls restrict application egress to required
+dependencies such as MinIO, Jaeger, and cluster DNS.
 
-Health probes allow Kubernetes to detect unhealthy application containers.
+Namespace Pod Security labels are also configured for additional
+policy enforcement, auditing, and warnings.
 
-Persistent storage protects MinIO data from normal container recreation.
+The application does not require access to the Kubernetes API, so no
+custom application RBAC permissions are required.
 
-Application-level storage failures are handled by the service rather than treating Kubernetes as the source of application business logic.
+Detailed security controls and verification are documented separately
+in [`docs/security.md`](security.md).
 
-### Directory Structure
+## Deployment Verification
+
+The Kubernetes deployment was verified through:
+
+* namespace creation
+* Deployment rollout
+* Pod startup
+* Service availability
+* ConfigMap configuration
+* Secret references
+* health-probe behavior
+* resource requests and limits
+* MinIO persistent storage
+* application-to-MinIO connectivity
+* Kubernetes security configuration
+
+The application and MinIO workloads were successfully deployed in the
+`thumbnail-pipeline` namespace.
+
+## Failure and Recovery
+
+Kubernetes failure and recovery behavior was tested during the project's
+failure-engineering phase.
+
+Examples included:
+
+* application container termination and automatic container restart
+* application Pod deletion and Deployment-based Pod replacement
+* MinIO Pod replacement
+* missing Secret causing MinIO startup failure
+* temporary readiness-probe failure
+* single-node scheduling failure after node cordoning
+* recovery after restoring the node to schedulable state
+* persistent-volume verification after MinIO Pod replacement
+
+Some failure experiments were intentionally limited by the local
+single-node Minikube environment. In particular, scheduling recovery
+was demonstrated by cordoning and uncordoning the only node rather
+than by moving workloads between multiple nodes.
+
+The complete failure-testing evidence is documented in
+[`docs/failure-engineering.md`](failure-engineering.md).
+
+## Directory Structure
 
 ```text
 k8s/
@@ -156,21 +235,27 @@ k8s/
     └── thumbnail-service.yaml
 ```
 
-The `knative/` manifest is maintained separately from the core Kubernetes Deployment resources because Knative provides a different serving model.
+The `knative/` manifest is maintained separately from the core
+Deployment resources because Knative provides an additional serving
+model.
 
-### Current Scope
+## Current Scope
 
-The Kubernetes implementation currently provides:
+The Kubernetes implementation provides:
 
-- Container orchestration with Kubernetes 
-- Minikube-based local deployment 
-- Kubernetes service discovery 
-- ConfigMap-based configuration 
-- Secret-based sensitive configuration 
-- Liveness and readiness probes 
-- **CPU** and memory requests/limits 
-- Persistent MinIO storage 
-- MinIO initialization 
-- Internal ClusterIP services
+* Kubernetes-based container orchestration
+* Minikube-based local deployment
+* Kubernetes service discovery
+* ConfigMap-based configuration
+* Secret-based sensitive configuration
+* Liveness and readiness probes
+* CPU and memory requests and limits
+* Persistent MinIO storage
+* MinIO initialization
+* Internal ClusterIP services
+* Container security hardening
+* NetworkPolicy controls
 
-Helm and Knative are maintained as separate project phases and documentation topics. 
+Helm provides the reusable deployment packaging layer, while Knative
+provides an additional serving and autoscaling capability. These are
+documented separately.
