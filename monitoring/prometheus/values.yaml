@@ -1,0 +1,33 @@
+alertmanager:
+  enabled: false
+
+kube-state-metrics:
+  enabled: false
+
+prometheus-node-exporter:
+  enabled: false
+
+prometheus-pushgateway:
+  enabled: false
+
+server:
+  persistentVolume:
+    enabled: false
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+
+extraScrapeConfigs: |
+  - job_name: "thumbnail-service"
+    metrics_path: "/metrics/"
+    static_configs:
+      - targets:
+          - "thumbnail-service.thumbnail-pipeline.svc.cluster.local:8000"
+        labels:
+          application: "thumbnail-service"
+          namespace: "thumbnail-pipeline"
