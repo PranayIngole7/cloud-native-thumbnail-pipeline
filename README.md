@@ -17,6 +17,7 @@ The application accepts an image, stores the original in MinIO, generates a Pill
                            │
                            ▼
                        Argo CD
+                     GitOps / Sync
                            │
                            ▼
                 Kubernetes / Minikube
@@ -27,17 +28,16 @@ The application accepts an image, stores the original in MinIO, generates a Pill
      Thumbnail Service                MinIO
       FastAPI + Pillow             Object Storage
               │                         │
-              └──────────┬──────────────┘
-                         │
-                         ▼
-                  PersistentVolume
-
-Observability:
-FastAPI → OpenTelemetry → Jaeger
-FastAPI → Prometheus → Grafana
-FastAPI → Kubernetes Logs
+              │                    PersistentVolume
+              │
+              └──── Observability
+                    Prometheus / Grafana
+                    OpenTelemetry / Jaeger
+```
 
 Additional serving capability:
+
+```text
 Knative Serving → Thumbnail Service
 ```
 
@@ -118,10 +118,8 @@ Create a Python environment and install dependencies:
 
 ```bash
 cd app
-
 python3 -m venv .venv
 source .venv/bin/activate
-
 pip install -r requirements.txt
 ```
 
@@ -137,15 +135,14 @@ Run tests:
 pytest -q
 ```
 
-The project also provides Docker Compose configuration for local
-application and MinIO development.
+The project also provides Docker Compose configuration for local application and MinIO development.
 
 ## Docker
 
 Build the application image:
 
 ```bash
-docker build -t thumbnail-service:0.1.9 ./app
+docker build -t thumbnail-service:0.1.5 ./app
 ```
 
 Run the container:
@@ -153,11 +150,10 @@ Run the container:
 ```bash
 docker run --rm \
   -p 8000:8000 \
-  thumbnail-service:0.1.9
+  thumbnail-service:0.1.5
 ```
 
-The image includes a Docker healthcheck and runs the application as a
-non-root user.
+The image includes a Docker healthcheck and runs the application as a non-root user.
 
 ## Kubernetes Deployment
 
@@ -225,7 +221,7 @@ See [`docs/knative.md`](docs/knative.md) for details.
 
 ### CI
 
-GitHub Actions validates changes by:
+GitHub Actions validates changes through:
 
 ```text
 Code
@@ -239,8 +235,7 @@ Container Runtime Validation
 Healthcheck
 ```
 
-The current workflow builds and validates the image but does not publish
-it to an external container registry.
+The current workflow builds and validates the image but does not publish it to an external container registry.
 
 ### GitOps
 
@@ -256,8 +251,7 @@ Git Repository
  Kubernetes
 ```
 
-The project demonstrates synchronization, drift detection, and
-self-healing.
+The project demonstrates synchronization, drift detection, and self-healing.
 
 ## Observability
 
@@ -269,8 +263,7 @@ The project includes:
 * **Jaeger** — distributed traces
 * **Kubernetes/application logs** — operational troubleshooting
 
-The thumbnail-processing workflow includes custom tracing spans for
-important processing and storage operations.
+The thumbnail-processing workflow includes custom tracing spans for important processing and storage operations.
 
 See [`docs/observability.md`](docs/observability.md).
 
@@ -290,9 +283,7 @@ Security controls include:
 * resource requests and limits
 * Trivy image scanning
 
-The verified Trivy scan reported `0` CRITICAL findings, while remaining
-HIGH findings were associated with Debian OS packages. The project does
-not claim that the image is vulnerability-free.
+The verified Trivy scan reported `0` CRITICAL findings, while remaining HIGH findings were associated with Debian OS packages. The project does not claim that the image is vulnerability-free.
 
 See [`docs/security.md`](docs/security.md).
 
@@ -300,7 +291,7 @@ See [`docs/security.md`](docs/security.md).
 
 Failure engineering was used to deliberately test system behavior.
 
-Examples include:
+### Application process failure
 
 ```text
 Application process failure
@@ -310,6 +301,8 @@ Container restart
 Health / readiness verification
 ```
 
+### Pod deletion
+
 ```text
 Pod deletion
         ↓
@@ -318,6 +311,8 @@ Deployment creates replacement Pod
 Application recovers
 ```
 
+### NetworkPolicy drift
+
 ```text
 NetworkPolicy drift
         ↓
@@ -325,6 +320,8 @@ Argo CD detects drift
         ↓
 Desired state restored
 ```
+
+### Node cordon
 
 ```text
 Node cordon
@@ -338,8 +335,7 @@ Pod scheduled and Running
 
 The experiments were performed on a single-node Minikube environment.
 
-See [`docs/failure-engineering.md`](docs/failure-engineering.md) and
-[`docs/troubleshooting.md`](docs/troubleshooting.md).
+See [`docs/failure-engineering.md`](docs/failure-engineering.md) and [`docs/troubleshooting.md`](docs/troubleshooting.md).
 
 ## Project Documentation
 
@@ -361,6 +357,7 @@ See [`docs/failure-engineering.md`](docs/failure-engineering.md) and
 
 ```text
 cloud-native-thumbnail-pipeline/
+
 ├── app/                    # FastAPI application and tests
 ├── helm/                   # Helm charts
 ├── k8s/                    # Kubernetes and Knative manifests
@@ -378,10 +375,7 @@ cloud-native-thumbnail-pipeline/
 
 **Status: ✅ Complete**
 
-The technical implementation covers application development,
-containerization, Kubernetes, Helm, Knative, CI, GitOps, observability,
-security, controlled failure/recovery testing and documentation.
-
+The technical implementation covers application development, containerization, Kubernetes, Helm, Knative, CI, GitOps, observability, security, controlled failure/recovery testing, and documentation.
 
 ## License
 
