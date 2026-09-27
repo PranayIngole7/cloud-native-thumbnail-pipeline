@@ -17,8 +17,7 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: thumbnail-pipeline
-              app.kubernetes.io/instance: "{{ .Release.Name }}"
+              app: minio
       ports:
         - protocol: TCP
           port: 9000
@@ -26,8 +25,7 @@ spec:
     - to:
         - podSelector:
             matchLabels:
-              app.kubernetes.io/name: thumbnail-pipeline
-              app.kubernetes.io/instance: "{{ .Release.Name }}"
+              app: jaeger
       ports:
         - protocol: TCP
           port: 4317
