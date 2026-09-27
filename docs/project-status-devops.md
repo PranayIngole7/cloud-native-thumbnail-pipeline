@@ -405,3 +405,42 @@ The system provides meaningful metrics, logs and traces for operational troubles
 The deployment follows practical container and Kubernetes security principles with demonstrated verification.
 
 ---
+
+# Phase 11 — Failure Engineering & Resilience
+
+**Status: ✅ COMPLETE**
+
+**Objective:** Deliberately break the system, understand failure modes, and demonstrate recovery.
+
+### Work
+1. Failure-engineering concepts
+2. Application failure
+3. Pod failure
+4. MinIO failure
+5. Network/service failure
+6. Readiness failure
+7. Liveness failure
+8. Resource pressure
+9. Container restart
+10. Kubernetes rescheduling
+11. Persistent-storage verification
+12. Recovery behavior
+13. Observability during failure
+14. Troubleshooting
+15. Recovery documentation
+
+### Verification
+- Failures can be reproduced
+- Failure symptoms are observable
+- Kubernetes responds appropriately
+- Application recovers
+- Persistent data survives where expected
+- Root cause can be identified
+- Recovery procedure is documented
+
+### Exit Criterion
+The project demonstrates not only successful deployment, but also controlled failure analysis and recovery.
+
+---
+
+
