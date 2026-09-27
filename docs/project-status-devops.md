@@ -1,8 +1,8 @@
 # Current Project Status
 
-**Date:** 25 September 2026
-**Current Phase:** Phase 6 — Knative Serving  ✅ COMPLETE
-**Next Step:** Phase 7 — CI with GitHub Actions
+**Date:** 27 September 2026
+**Current Phase:** Phase 10 — Security  ✅ COMPLETE
+**Next Step:** Phase 11 — Failure Engineering & Resilience
 
 ---
 
@@ -334,3 +334,74 @@ Kubernetes deployment is managed declaratively through Git and Argo CD.
 
 ---
 
+# Phase 9 — Observability
+
+**Status: ✅ COMPLETE**
+
+**Objective:** Add metrics, logs, traces and dashboards so the system can be observed in operation.
+
+### Work
+1. Observability concepts
+2. Metrics
+3. Logs
+4. Distributed tracing
+5. Prometheus
+6. Grafana
+7. OpenTelemetry
+8. Application instrumentation
+9. Kubernetes metrics
+10. Dashboard creation
+11. Request/latency/error metrics
+12. Failure observation
+13. Alerting concepts
+14. Troubleshooting using telemetry
+
+### Verification
+- Application metrics are available
+- Kubernetes metrics are available
+- Grafana dashboard works
+- Logs are useful for troubleshooting
+- Traces can follow requests
+- Failures can be observed through telemetry
+
+### Exit Criterion
+The system provides meaningful metrics, logs and traces for operational troubleshooting.
+
+---
+
+# Phase 10 — Security
+
+**Status: ✅ COMPLETE**
+
+**Objective:** Harden the application, container and Kubernetes deployment.
+
+### Work
+1. Kubernetes security concepts
+2. Secrets management
+3. Non-root containers
+4. SecurityContext
+5. Pod security
+6. RBAC
+7. Service accounts
+8. Network policies
+9. Image scanning
+10. Trivy
+11. Dependency/security scanning
+12. Least privilege
+13. Resource controls
+14. Security failure testing
+15. Security documentation
+
+### Verification
+- Images are scanned
+- Vulnerabilities are reviewed
+- Containers run with appropriate privileges
+- RBAC is restricted
+- Secrets are protected
+- Network access is controlled
+- Security policies are verified
+
+### Exit Criterion
+The deployment follows practical container and Kubernetes security principles with demonstrated verification.
+
+---
